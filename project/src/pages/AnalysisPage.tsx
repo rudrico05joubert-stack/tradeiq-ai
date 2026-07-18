@@ -76,41 +76,67 @@ export function AnalysisPage({ id }: { id: string }) {
 
       <main className="mx-auto max-w-[1400px] px-5 py-6 pb-24">
         {/* Disclaimer bar */}
-        <GlassCard className="mb-5 p-6">
-  <div className="flex items-center justify-between">
-    <div>
-      <DirectionBadge direction={a.direction} size="md" />
+        <GlassCard className="mb-6 overflow-hidden">
+  <div className="relative p-10 text-center">
 
-      <h1 className="mt-3 font-display text-4xl font-700 text-white">
-        {a.direction === 'buy'
-          ? 'BUY'
-          : a.direction === 'sell'
-          ? 'SELL'
-          : 'WAIT'}
+    {/* Background Glow */}
+    <div className="absolute inset-0 bg-gradient-to-r from-neon-500/5 via-transparent to-neon-500/5" />
+
+    <div className="relative">
+
+      <div className="inline-flex items-center gap-2 rounded-full border border-neon-500/20 bg-neon-500/10 px-4 py-1">
+        <Sparkles size={14} className="text-neon-400" />
+        <span className="text-xs font-medium tracking-[0.25em] uppercase text-neon-400">
+          NEXORA AI
+        </span>
+      </div>
+
+      <p className="mt-5 text-xs uppercase tracking-[0.35em] text-ink-500">
+        Market Intelligence Report
+      </p>
+
+      <h1
+        className={`mt-6 font-display text-7xl font-700 tracking-tight ${
+          a.direction === 'buy'
+            ? 'text-neon-400'
+            : a.direction === 'sell'
+            ? 'text-bear-400'
+            : 'text-warn-400'
+        }`}
+      >
+        {a.direction.toUpperCase()}
       </h1>
 
-      <p className="mt-2 text-ink-300">
+      <div className="mt-6 flex justify-center">
+        {a.setup_grade && <GradeBadge grade={a.setup_grade} size="lg" />}
+      </div>
+
+      <div className="mt-6">
+        <div className="text-6xl font-700 text-white">
+          {a.confidence}
+          <span className="text-3xl text-ink-400">%</span>
+        </div>
+
+        <p className="mt-2 text-sm uppercase tracking-[0.25em] text-ink-400">
+          AI Confidence Score
+        </p>
+      </div>
+
+      <div className="mx-auto mt-6 max-w-md">
+        <ProgressBar value={a.confidence} />
+      </div>
+
+      <p className="mt-6 text-lg font-medium text-white">
         {gradeLabel}
       </p>
-    </div>
 
-    <div className="text-right">
-      <div className="text-5xl font-700 text-neon-400">
-        {a.confidence}%
-      </div>
+      <p className="mt-2 text-sm text-ink-400">
+        Generated {fmtDateTime(a.created_at)}
+      </p>
 
-      <ProgressBar value={a.confidence} />
-
-      <div className="mt-4">
-        {a.setup_grade && (
-          <GradeBadge
-            grade={a.setup_grade}
-            size="lg"
-          />
-        )}
-      </div>
     </div>
   </div>
+ 
 </GlassCard>
         <div className="mb-5 flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-ink-400">
           <Shield size={13} className="shrink-0 text-neon-400" />

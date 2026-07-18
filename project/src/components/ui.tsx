@@ -13,7 +13,7 @@ export function Logo({ size = 34, withText = true }: { size?: number; withText?:
       {withText && (
         <div className="leading-tight">
           <div className="font-display text-[15px] font-700 tracking-tight text-white">
-            TradeIQ<span className="text-neon-400"> AI</span>
+            NEXORA<span className="text-neon-400"> AI</span>
           </div>
           <div className="text-[9px] uppercase tracking-[0.22em] text-ink-400">AI Trading Assistant</div>
         </div>

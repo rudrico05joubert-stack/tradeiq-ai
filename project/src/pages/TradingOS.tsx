@@ -86,7 +86,7 @@ export function TradingOS({ view, setView }: { view: View; setView: (v: View) =>
               <button onClick={() => setSidebarOpen(true)} className="md:hidden text-ink-200"><Menu size={20} /></button>
               <div>
                 <h1 className="font-display text-base font-600 text-white">{NAV.find((t) => t.id === view)?.label}</h1>
-                <p className="text-[11px] text-ink-400">TradeIQ AI · Trading Operating System</p>
+                <p className="text-[11px] text-ink-400">NEXORA AI · Trading Operating System</p>
               </div>
             </div>
             <UsagePill />

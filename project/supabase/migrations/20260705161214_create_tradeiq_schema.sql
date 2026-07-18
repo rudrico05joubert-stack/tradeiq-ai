@@ -1,8 +1,8 @@
 /*
-# TradeIQ AI — auth-scoped schema (chart analyses + trading journal)
+# NEXORA AI — auth-scoped schema (chart analyses + trading journal)
 
 ## Overview
-TradeIQ AI is an AI trading-assistant SaaS. Users sign in with email/password,
+NEXORA AI is an AI trading-assistant SaaS. Users sign in with email/password,
 upload an MT5 chart screenshot, and receive AI-powered technical analysis
 (trend, entry/SL/TP, confidence, R:R, reasoning). They can also keep a
 trading journal and view win-rate / accuracy stats.

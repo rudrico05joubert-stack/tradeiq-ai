@@ -1,5 +1,5 @@
 /*
-# TradeIQ AI — extend chart_analyses with grading + overlay data
+# NEXORA AI — extend chart_analyses with grading + overlay data
 
 ## Overview
 Redesigns the analysis experience as a "premium AI terminal". The new flow

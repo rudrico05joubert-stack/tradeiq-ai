@@ -28,14 +28,40 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
   };
 
   const onTerminalComplete = async () => {
-    if (!file || !user || !profile) return;
+    console.log("========== ANALYSIS START ==========");
+  
+    if (!file || !user || !profile) {
+      console.log("❌ Missing data");
+      console.log({
+        file: !!file,
+        user: !!user,
+        profile: !!profile,
+      });
+      return;
+    }
+  
     try {
+      console.log("1️⃣ Creating image signature...");
       const sig = await imageSignature(file);
-      const gen = generateAnalysis({ imageSignature: sig, symbol: symbol || 'AUTO', timeframe });
+      console.log("✅ Signature created");
+  
+      console.log("2️⃣ Generating analysis...");
+      const gen = generateAnalysis({
+        imageSignature: sig,
+        symbol: symbol || "AUTO",
+        timeframe,
+      });
+      console.log("✅ Analysis generated");
+  
+      console.log("3️⃣ Uploading chart...");
       const imageUrl = await uploadChart(file, user.id);
+      console.log("✅ Upload complete");
+      console.log(imageUrl);
+  
+      console.log("4️⃣ Saving analysis...");
       const saved = await insertAnalysis({
         user_id: user.id,
-        symbol: symbol || 'AUTO',
+        symbol: symbol || "AUTO",
         timeframe,
         image_url: imageUrl,
         market_trend: gen.market_trend,
@@ -47,8 +73,8 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
         risk_reward: gen.risk_reward,
         reasons: gen.reasons,
         indicators: gen.indicators,
-        notes: '',
-        status: 'completed',
+        notes: "",
+        status: "completed",
         setup_grade: gen.setup_grade,
         risk_score: gen.risk_score,
         trend_strength: gen.trend_strength,
@@ -56,15 +82,49 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
         overlays: gen.overlays,
         detailed_explanation: gen.detailed_explanation,
       });
+  
+      console.log("✅ Analysis saved");
+      console.log(saved);
+  
+      console.log("5️⃣ Updating usage...");
       await bumpUsage(profile);
+      console.log("✅ Usage updated");
+  
+      console.log("6️⃣ Refreshing profile...");
       await refreshProfile();
-      if (terminal?.imageUrl) URL.revokeObjectURL(terminal.imageUrl);
+      console.log("✅ Profile refreshed");
+  
+      if (terminal?.imageUrl) {
+        URL.revokeObjectURL(terminal.imageUrl);
+      }
+  
       setTerminal(null);
-      navigate({ name: 'analysis', id: saved.id });
-    } catch (e) {
-      if (terminal?.imageUrl) URL.revokeObjectURL(terminal.imageUrl);
+  
+      console.log("7️⃣ Navigating...");
+      navigate({
+        name: "analysis",
+        id: saved.id,
+      });
+  
+      console.log("========== SUCCESS ==========");
+    } catch (err) {
+      console.error("========== ERROR ==========");
+      console.error(err);
+  
+      if (terminal?.imageUrl) {
+        URL.revokeObjectURL(terminal.imageUrl);
+      }
+  
       setTerminal(null);
-      setError(e instanceof Error ? e.message : 'Analysis failed. Please try again.');
+  
+      const message =
+        err instanceof Error
+          ? err.message
+          : JSON.stringify(err);
+  
+      alert(message);
+  
+      setError(message);
     }
   };
 

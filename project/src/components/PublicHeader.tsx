@@ -63,12 +63,12 @@ export function Footer() {
         <div>
           <Logo />
           <p className="mt-3 max-w-md text-xs leading-relaxed text-ink-400">
-            TradeIQ AI provides AI-generated technical analysis for educational purposes only and is not financial advice.
+            NEXORA AI provides AI-generated technical analysis for educational purposes only and is not financial advice.
             Trading involves substantial risk. Past performance does not guarantee future results.
           </p>
         </div>
         <div className="flex flex-wrap gap-x-8 gap-y-2 text-xs text-ink-400">
-          <span>© {new Date().getFullYear()} TradeIQ AI</span>
+          <span>© {new Date().getFullYear()} NEXORA AI</span>
           <a href="#features" className="hover:text-white">Features</a>
           <a href="#pricing" className="hover:text-white">Pricing</a>
           <a href="#" className="hover:text-white">Terms</a>

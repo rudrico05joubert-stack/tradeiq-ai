@@ -1,5 +1,5 @@
 /*
-# TradeIQ AI — trading OS schema extensions
+# NEXORA AI — trading OS schema extensions
 
 ## Overview
 Transforms the product into a "trading operating system" with a watchlist.
