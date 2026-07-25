@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Crown, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { GlassCard, Spinner } from '../components/ui';
-import { updateProfile, upgradePlan } from '../lib/api';
+import { updateProfile } from '../lib/api';
 import type { Plan } from '../lib/supabase';
 import { PLAN_FEATURES } from '../lib/supabase';
 
@@ -11,23 +11,17 @@ export function SettingsView({ refreshProfile }: { refreshProfile: () => Promise
   const [name, setName] = useState(profile?.display_name ?? '');
   const [savingName, setSavingName] = useState(false);
   const [savedName, setSavedName] = useState(false);
-  const [planBusy, setPlanBusy] = useState<Plan | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const saveName = async () => {
     if (!user) return;
     setSavingName(true); setError(null);
-    try { await updateProfile(user.id, { display_name: name }); await refreshProfile(); setSavedName(true); setTimeout(() => setSavedName(false), 1800); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
+    try {
+      await updateProfile(user.id, { display_name: name.trim().slice(0, 80) });
+      await refreshProfile(); setSavedName(true);
+      setTimeout(() => setSavedName(false), 1800);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
     finally { setSavingName(false); }
-  };
-
-  const changePlan = async (plan: Plan) => {
-    if (!user || plan === profile?.plan) return;
-    setPlanBusy(plan); setError(null);
-    try { await upgradePlan(user.id, plan); await refreshProfile(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Plan change failed'); }
-    finally { setPlanBusy(null); }
   };
 
   return (
@@ -36,41 +30,29 @@ export function SettingsView({ refreshProfile }: { refreshProfile: () => Promise
       <GlassCard className="p-6">
         <h2 className="font-display text-lg font-600 text-white">Profile</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Field label="Display name"><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></Field>
+          <Field label="Display name"><input className="input" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="Email"><input className="input opacity-60" value={user?.email ?? ''} disabled /></Field>
         </div>
         <div className="mt-4 flex items-center gap-3">
-          <button onClick={saveName} disabled={savingName} className="btn-neon">{savingName ? <Spinner /> : 'Save changes'}</button>
-          {savedName && <span className="text-xs text-neon-400 flex items-center gap-1"><Check size={13} /> Saved</span>}
+          <button onClick={saveName} disabled={savingName || !name.trim()} className="btn-neon">{savingName ? <Spinner /> : 'Save changes'}</button>
+          {savedName && <span className="flex items-center gap-1 text-xs text-neon-400"><Check size={13} /> Saved</span>}
         </div>
       </GlassCard>
-
       <GlassCard className="p-6">
-        <div className="flex items-center gap-2">
-          <Crown size={18} className="text-neon-400" />
-          <h2 className="font-display text-lg font-600 text-white">Subscription</h2>
-        </div>
+        <div className="flex items-center gap-2"><Crown size={18} className="text-neon-400" /><h2 className="font-display text-lg font-600 text-white">Subscription</h2></div>
         <p className="mt-1 text-xs text-ink-400">Current plan: <span className="capitalize text-ink-200">{profile?.plan}</span></p>
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          {(['free', 'pro', 'elite'] as Plan[]).map((p) => {
-            const f = PLAN_FEATURES[p];
-            const current = profile?.plan === p;
-            return (
-              <div key={p} className={`rounded-xl border p-4 ${current ? 'border-neon-500/40 bg-neon-500/[0.05]' : 'border-white/[0.06] bg-white/[0.02]'}`}>
-                <div className="flex items-center justify-between">
-                  <span className="font-display font-600 text-white">{f.label}</span>
-                  {current && <span className="chip bg-neon-500/15 text-neon-400 border border-neon-500/30 text-[10px]">Current</span>}
-                </div>
-                <div className="mono mt-1 text-lg text-white">{f.price}<span className="text-xs text-ink-400">/mo</span></div>
-                <ul className="mt-3 space-y-1.5">
-                  {f.features.slice(0, 3).map((feat) => <li key={feat} className="flex items-start gap-1.5 text-[11px] text-ink-300"><Check size={12} className="mt-0.5 text-neon-400" /> {feat}</li>)}
-                </ul>
-                {!current && <button onClick={() => changePlan(p)} disabled={planBusy !== null} className="mt-3 w-full btn-outline text-xs py-2">{planBusy === p ? <Spinner size={13} /> : `Switch to ${f.label}`}</button>}
-              </div>
-            );
+          {(['free', 'pro', 'elite'] as Plan[]).map((plan) => {
+            const details = PLAN_FEATURES[plan]; const current = profile?.plan === plan;
+            return <div key={plan} className={`rounded-xl border p-4 ${current ? 'border-neon-500/40 bg-neon-500/[0.05]' : 'border-white/[0.06] bg-white/[0.02]'}`}>
+              <div className="flex items-center justify-between"><span className="font-display font-600 text-white">{details.label}</span>{current && <span className="chip border border-neon-500/30 bg-neon-500/15 text-[10px] text-neon-400">Current</span>}</div>
+              <div className="mono mt-1 text-lg text-white">{details.price}<span className="text-xs text-ink-400">/mo</span></div>
+              <ul className="mt-3 space-y-1.5">{details.features.slice(0, 3).map((feature) => <li key={feature} className="flex items-start gap-1.5 text-[11px] text-ink-300"><Check size={12} className="mt-0.5 text-neon-400" /> {feature}</li>)}</ul>
+              {!current && <button disabled className="btn-outline mt-3 w-full py-2 text-xs opacity-50">Coming soon</button>}
+            </div>;
           })}
         </div>
-        <p className="mt-3 text-[11px] text-ink-500">Demo billing — no payment is processed.</p>
+        <p className="mt-3 text-[11px] text-ink-500">Paid plans are opening soon. Your plan will never change without checkout confirmation.</p>
       </GlassCard>
     </div>
   );

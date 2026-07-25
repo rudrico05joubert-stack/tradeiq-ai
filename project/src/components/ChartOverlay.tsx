@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ChartOverlays, Direction } from '../lib/supabase';
+import type { ChartOverlays } from '../lib/supabase';
 
 interface Props {
   imageUrl: string;
   overlays: ChartOverlays | null;
-  direction: Direction;
   entry?: number | null;
   stopLoss?: number | null;
   takeProfit?: number | null;
@@ -22,7 +21,7 @@ const TOGGLES: { key: ToggleKey; label: string; color: string }[] = [
   { key: 'takeProfit', label: 'Take Profit', color: '#10e96b' },
 ];
 
-export function ChartOverlay({ imageUrl, overlays, direction, entry, stopLoss, takeProfit }: Props) {
+export function ChartOverlay({ imageUrl, overlays, entry, stopLoss, takeProfit }: Props) {
   const [on, setOn] = useState<Record<ToggleKey, boolean>>({
     sr: true, ema: true, liquidity: true, patterns: true, entry: true, stopLoss: true, takeProfit: true,
   });

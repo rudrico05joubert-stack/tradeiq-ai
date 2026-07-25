@@ -5,8 +5,8 @@ import { navigate } from '../lib/router';
 import { IconBadge, GlassCard } from '../components/ui';
 import { Dropzone } from '../components/Dropzone';
 import { AnalysisTerminal } from '../components/AnalysisTerminal';
-import { generateAnalysis, imageSignature } from '../lib/engine';
-import { uploadChart, insertAnalysis, bumpUsage, getUsageRemaining } from '../lib/api';
+import { analyzeWithAI } from '../lib/ai';
+import { uploadChart, insertAnalysis, getUsageRemaining } from '../lib/api';
 
 export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Promise<void> }) {
   const { user, profile } = useAuth();
@@ -34,25 +34,20 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
       console.log("❌ Missing data");
       console.log({
         file: !!file,
-        user: !!user,
+        user: !!user, 
         profile: !!profile,
       });
       return;
     }
   
     try {
-      console.log("1️⃣ Creating image signature...");
-      const sig = await imageSignature(file);
-      console.log("✅ Signature created");
-  
-      console.log("2️⃣ Generating analysis...");
-      const gen = generateAnalysis({
-        imageSignature: sig,
-        symbol: symbol || "AUTO",
+      console.log('Sending chart to AI...');
+      const gen = await analyzeWithAI({
+        file,
+        symbol: symbol || 'AUTO',
         timeframe,
       });
-      console.log("✅ Analysis generated");
-  
+      console.log('AI analysis received.');
       console.log("3️⃣ Uploading chart...");
       const imageUrl = await uploadChart(file, user.id);
       console.log("✅ Upload complete");
@@ -87,7 +82,6 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
       console.log(saved);
   
       console.log("5️⃣ Updating usage...");
-      await bumpUsage(profile);
       console.log("✅ Usage updated");
   
       console.log("6️⃣ Refreshing profile...");
@@ -121,8 +115,6 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
         err instanceof Error
           ? err.message
           : JSON.stringify(err);
-  
-      alert(message);
   
       setError(message);
     }

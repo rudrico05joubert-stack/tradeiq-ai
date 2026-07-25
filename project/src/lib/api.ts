@@ -14,7 +14,7 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
   return data as Profile | null;
 }
 
-export async function updateProfile(userId: string, patch: Partial<Pick<Profile, 'display_name' | 'plan'>>): Promise<void> {
+export async function updateProfile(userId: string, patch: Pick<Profile, 'display_name'>): Promise<void> {
   const { error } = await supabase.from('profiles').update(patch).eq('id', userId);
   if (error) throw error;
 }
@@ -28,20 +28,6 @@ export async function getUsageRemaining(profile: Profile | null): Promise<{ rema
   const used = profile.daily_usage_date === tk ? profile.daily_usage_count : 0;
   const remaining = limit === Infinity ? Infinity : Math.max(0, limit - used);
   return { remaining, used, limit };
-}
-
-// Increment today's usage, resetting if the date changed. Returns updated profile.
-export async function bumpUsage(profile: Profile): Promise<Profile> {
-  const tk = todayKey();
-  const newCount = profile.daily_usage_date === tk ? profile.daily_usage_count + 1 : 1;
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ daily_usage_count: newCount, daily_usage_date: tk })
-    .eq('id', profile.id)
-    .select('*')
-    .single();
-  if (error) throw error;
-  return data as Profile;
 }
 
 // ---------- Chart storage ----------
@@ -211,10 +197,6 @@ export async function fetchStats(userId: string): Promise<TradingStats> {
     wins, losses, breakeven, pending,
     winRate, accuracy, pnl,
   };
-}
-
-export async function upgradePlan(userId: string, plan: Plan): Promise<void> {
-  await updateProfile(userId, { plan });
 }
 
 // ---------- Watchlist ----------

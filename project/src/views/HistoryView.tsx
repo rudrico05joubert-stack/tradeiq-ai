@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { History, ArrowRight, Trash2, Clock, Check } from 'lucide-react';
+import { History, ArrowRight, Trash2 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { navigate } from '../lib/router';
 import { GlassCard, Spinner } from '../components/ui';
 import { DirectionBadge, ProgressBar } from '../components/Analysis';
 import { fetchRecentAnalyses, fetchStats, deleteAnalysis } from '../lib/api';
 import type { ChartAnalysis, TradingStats } from '../lib/api';
-import { fmtPrice, fmtTimeAgo, fmtDateTime, fmtPct } from '../lib/format';
+import { fmtPrice, fmtDateTime, fmtPct } from '../lib/format';
 
 export function HistoryView() {
   const { user } = useAuth();

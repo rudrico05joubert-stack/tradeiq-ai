@@ -6,7 +6,7 @@ import { DirectionBadge } from '../components/Analysis';
 import { fetchJournal, insertJournal, deleteJournal, updateJournal } from '../lib/api';
 import type { JournalEntry, Outcome } from '../lib/api';
 import type { Direction } from '../lib/supabase';
-import { fmtPrice, fmtRR, fmtPct } from '../lib/format';
+import { fmtPrice, fmtPct } from '../lib/format';
 
 export function JournalView() {
   const { user } = useAuth();

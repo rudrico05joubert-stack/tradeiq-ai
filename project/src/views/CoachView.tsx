@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Brain, Sparkles, TrendingUp, Target, Shield, Lightbulb, ArrowRight } from 'lucide-react';
+import { Brain, TrendingUp, Target, Shield, Lightbulb } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { navigate } from '../lib/router';
 import { GlassCard, Spinner } from '../components/ui';

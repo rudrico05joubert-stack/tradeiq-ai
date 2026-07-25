@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Clock, BarChart3, BookOpen, Sparkles, TrendingUp, Eye } from 'lucide-react';
+import { ArrowRight, Clock, BarChart3, BookOpen, Sparkles, Eye } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { navigate } from '../lib/router';
 import type { View } from '../pages/TradingOS';
@@ -9,7 +9,7 @@ import { RadialGauge, StatTile } from '../components/Gauges';
 import { fetchRecentAnalyses, fetchStats, fetchWatchlist } from '../lib/api';
 import type { ChartAnalysis, TradingStats } from '../lib/api';
 import type { WatchlistItem } from '../lib/supabase';
-import { fmtPrice, fmtTimeAgo, fmtPct } from '../lib/format';
+import { fmtTimeAgo, fmtPct } from '../lib/format';
 
 export function DashboardView({ setView }: { setView: (v: View) => void }) {
   const { user } = useAuth();

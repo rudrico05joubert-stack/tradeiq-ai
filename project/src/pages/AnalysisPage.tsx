@@ -6,7 +6,7 @@ import { fetchAnalysis, insertJournal } from '../lib/api';
 import type { ChartAnalysis } from '../lib/supabase';
 import { fmtPrice, fmtRR, fmtDateTime } from '../lib/format';
 import { Logo, Spinner, GlassCard } from '../components/ui';
-import { DirectionBadge, ConfidenceRing, ProgressBar, GradeBadge, RiskScoreBar } from '../components/Analysis';
+import { DirectionBadge, ProgressBar, GradeBadge, RiskScoreBar } from '../components/Analysis';
 import { RadialGauge, LinearGauge } from '../components/Gauges';
 import { ChartOverlay } from '../components/ChartOverlay';
 
@@ -148,7 +148,7 @@ export function AnalysisPage({ id }: { id: string }) {
           {/* LEFT: chart + indicators + explanation */}
           <div className="space-y-5">
             {a.image_url && a.overlays ? (
-              <ChartOverlay imageUrl={a.image_url} overlays={a.overlays} direction={a.direction} entry={a.entry} stopLoss={a.stop_loss} takeProfit={a.take_profit} />
+              <ChartOverlay imageUrl={a.image_url} overlays={a.overlays} entry={a.entry} stopLoss={a.stop_loss} takeProfit={a.take_profit} />
             ) : (
               <GlassCard className="overflow-hidden">
                 {a.image_url && <img src={a.image_url} alt={a.symbol} className="w-full max-h-[460px] object-contain bg-ink-900" />}
