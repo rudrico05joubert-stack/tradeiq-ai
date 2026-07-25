@@ -23,7 +23,18 @@ const analysisSchema = {
     entry: { type: 'number' }, stop_loss: { type: 'number' }, take_profit: { type: 'number' },
     risk_reward: { type: 'number', minimum: 0 },
     reasons: { type: 'array', minItems: 3, maxItems: 6, items: { type: 'string' } },
-    indicators: { type: 'object', additionalProperties: { type: 'number' } },
+    indicators: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['RSI (14)', 'EMA 50', 'EMA 200', 'ATR %', 'Bullish Candles %'],
+      properties: {
+        'RSI (14)': { type: 'number' },
+        'EMA 50': { type: 'number' },
+        'EMA 200': { type: 'number' },
+        'ATR %': { type: 'number' },
+        'Bullish Candles %': { type: 'number' },
+      },
+    },
     overlays: {
       type: 'object', additionalProperties: false,
       required: ['support', 'resistance', 'liquidity', 'ema50', 'ema200', 'entryZone', 'stopLoss', 'takeProfit', 'patterns'],
