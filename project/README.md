@@ -36,6 +36,18 @@ npm run build
 - `OPENAI_API_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `PAYSTACK_SECRET_KEY`
+- `PAYSTACK_PRO_PLAN_CODE`
+- `PAYSTACK_ELITE_PLAN_CODE`
+- `PAYSTACK_CALLBACK_URL`
+
+## Required browser configuration
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Paystack test and live environments use different secret keys and plan codes. After Paystack approves the business, create the Pro and Elite plans in Live Mode, replace the three Paystack values in Vercel, and configure the live webhook URL as `https://www.nexoracharts.com/api/payments-webhook` before accepting real customers.
 
 `OPENAI_API_KEY` must never use a `VITE_` prefix or be exposed to browser code.
 
