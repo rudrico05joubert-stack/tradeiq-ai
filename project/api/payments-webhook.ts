@@ -140,12 +140,12 @@ async function activateCharge(data: PaystackEventData) {
   }
 }
 
-async function updateSubscription(eventName: string, data: PaystackEventData) {
+async function updateSubscription(eventName: string, data: PaystackEventData): Promise<boolean> {
   const subscription = data.subscription ?? data;
   const plan = planFromPaystackCode(planCode(subscription.plan ?? data.plan));
-  if (!plan) return;
+  if (!plan) return true;
   const userId = await findUserId(data, plan);
-  if (!userId) return;
+  if (!userId) return false;
 
   const status = eventName === 'subscription.disable'
     ? 'disabled'
@@ -161,6 +161,7 @@ async function updateSubscription(eventName: string, data: PaystackEventData) {
     const { error } = await service.from('profiles').update({ plan: 'free' }).eq('id', userId);
     if (error) throw error;
   }
+  return true;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -184,7 +185,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (event.event === 'charge.success') await activateCharge(event.data);
     else if (['subscription.create', 'subscription.disable', 'subscription.not_renew', 'invoice.payment_failed', 'invoice.update'].includes(event.event)) {
-      await updateSubscription(event.event, event.data);
+      const handled = await updateSubscription(event.event, event.data);
+      if (!handled) throw new Error('RETRY_EVENT');
     }
     const { error: eventError } = await service.from('paystack_webhook_events').insert({
       event_hash: eventHash,
