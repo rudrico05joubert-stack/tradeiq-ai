@@ -1,25 +1,56 @@
-import { getServiceClient, paystackRequest, requireUser } from './_payments.js';
+import { getServiceClient, paystackRequest, planFromPaystackCode, requireUser } from './_payments.js';
 
 type VercelRequest = { method?: string; headers: Record<string, string | string[] | undefined> };
 type VercelResponse = { status: (code: number) => { json: (body: unknown) => void } };
+type PaystackSubscription = {
+  subscription_code?: string;
+  status?: string;
+  next_payment_date?: string | null;
+  plan?: { plan_code?: string } | string;
+};
+type PaystackCustomer = { subscriptions?: PaystackSubscription[] };
+
+function planCode(value?: PaystackSubscription['plan']): string | undefined {
+  return typeof value === 'string' ? value : value?.plan_code;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const { user } = await requireUser(req);
     const service = getServiceClient();
-    const { data: subscription, error } = await service
+    const { data: existingSubscription, error } = await service
       .from('subscriptions')
-      .select('subscription_code,status')
+      .select('subscription_code,customer_code,plan,status')
       .eq('user_id', user.id)
       .in('status', ['active', 'attention', 'non-renewing'])
       .maybeSingle();
     if (error) throw error;
-    if (!subscription?.subscription_code) {
+    if (!existingSubscription) {
       return res.status(409).json({ error: 'Billing management is not available yet. Please contact support@nexoracharts.com.' });
     }
 
-    const data = await paystackRequest<{ link: string }>(`/subscription/${encodeURIComponent(subscription.subscription_code)}/manage/link`);
+    let subscriptionCode = existingSubscription.subscription_code as string | null;
+    if (!subscriptionCode && existingSubscription.customer_code) {
+      const customer = await paystackRequest<PaystackCustomer>(`/customer/${encodeURIComponent(existingSubscription.customer_code)}`);
+      const matching = customer.subscriptions?.find((item) =>
+        planFromPaystackCode(planCode(item.plan)) === existingSubscription.plan && item.status !== 'disabled');
+      if (matching?.subscription_code) {
+        subscriptionCode = matching.subscription_code;
+        const { error: updateError } = await service.from('subscriptions').update({
+          subscription_code: subscriptionCode,
+          status: matching.status ?? existingSubscription.status,
+          next_payment_date: matching.next_payment_date ?? null,
+          updated_at: new Date().toISOString(),
+        }).eq('user_id', user.id);
+        if (updateError) throw updateError;
+      }
+    }
+    if (!subscriptionCode) {
+      return res.status(409).json({ error: 'Billing management is not available yet. Please contact support@nexoracharts.com.' });
+    }
+
+    const data = await paystackRequest<{ link: string }>(`/subscription/${encodeURIComponent(subscriptionCode)}/manage/link`);
     let link: URL;
     try { link = new URL(data.link); }
     catch { throw new Error('INVALID_MANAGE_LINK'); }
