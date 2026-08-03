@@ -208,9 +208,9 @@ function UploadIcon() {
 function PriceCard({ planId, icon: Icon, featured }: { planId: 'free' | 'pro' | 'elite'; icon: typeof Zap; featured: boolean }) {
   const { user } = useAuth();
   const plan = {
-    free: { label: 'Free', price: '$0', tagline: 'Try the engine', features: ['3 analyses per day', 'Trend + RSI + EMA', 'Confidence score', 'Single chart at a time'] },
-    pro: { label: 'Pro', price: '$29', tagline: 'For active traders', features: ['Unlimited analyses', 'All 7 analysis modules', 'Risk-to-reward calculator', 'Priority processing'] },
-    elite: { label: 'Elite', price: '$79', tagline: 'Full toolkit', features: ['Unlimited analyses', 'AI Coach (1:1 guidance)', 'Trading Journal', 'Premium features & early access'] },
+    free: { label: 'Free', price: 'R0', tagline: 'Try the engine', features: ['3 analyses per day', 'Trend + RSI + EMA', 'Confidence score', 'Single chart at a time'] },
+    pro: { label: 'Pro', price: 'R399', tagline: 'For active traders', features: ['Unlimited analyses', 'All 7 analysis modules', 'Risk-to-reward calculator', 'Priority processing'] },
+    elite: { label: 'Elite', price: 'R799', tagline: 'Full toolkit', features: ['Unlimited analyses', 'AI Coach (1:1 guidance)', 'Trading Journal', 'Premium features & early access'] },
   }[planId];
 
   return (

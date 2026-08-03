@@ -3,6 +3,31 @@ import { todayKey } from './format';
 
 export type { ChartAnalysis, JournalEntry, Outcome, Plan, Profile, WatchlistItem };
 
+async function authenticatedPost<T>(path: string, body: unknown): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Please sign in again.');
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) throw new Error(payload.error || 'Request failed.');
+  return payload as T;
+}
+
+export async function startCheckout(plan: 'pro' | 'elite'): Promise<void> {
+  const data = await authenticatedPost<{ authorization_url: string }>('/api/payments-initialize', { plan });
+  if (!data.authorization_url?.startsWith('https://checkout.paystack.com/')) throw new Error('Checkout returned an invalid payment address.');
+  window.location.assign(data.authorization_url);
+}
+
+export async function verifyPayment(reference: string): Promise<'pro' | 'elite'> {
+  const data = await authenticatedPost<{ verified: boolean; plan: 'pro' | 'elite' }>('/api/payments-verify', { reference });
+  if (!data.verified) throw new Error('Payment could not be verified.');
+  return data.plan;
+}
+
 // ---------- Profile ----------
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
