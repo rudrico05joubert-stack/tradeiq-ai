@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { getServiceClient, paystackSecret, planFromPaystackCode, type PaidPlan } from './_payments.js';
+import { getServiceClient, paystackRequest, paystackSecret, planFromPaystackCode, type PaidPlan } from './_payments.js';
 
 type VercelRequest = AsyncIterable<Uint8Array> & {
   method?: string;
@@ -32,6 +32,9 @@ type PaystackEventData = {
   next_payment_date?: string | null;
 };
 type PaystackEvent = { event?: string; data?: PaystackEventData };
+type PaystackCustomerDetails = {
+  subscriptions?: Array<PaystackSubscription>;
+};
 
 export const config = { api: { bodyParser: false } };
 
@@ -124,6 +127,17 @@ async function activateCharge(data: PaystackEventData) {
   const { error: profileError } = await service.from('profiles').update({ plan }).eq('id', userId);
   if (profileError) throw profileError;
   await saveSubscription(data, userId, plan, 'active');
+
+  const customerCode = data.customer?.customer_code;
+  const subscriptionCode = data.subscription_code ?? data.subscription?.subscription_code;
+  if (customerCode && !subscriptionCode) {
+    const customer = await paystackRequest<PaystackCustomerDetails>(`/customer/${encodeURIComponent(customerCode)}`);
+    const matchingSubscription = customer.subscriptions?.find((item) =>
+      planFromPaystackCode(planCode(item.plan)) === plan && item.status !== 'disabled');
+    if (matchingSubscription) {
+      await saveSubscription({ customer: data.customer, subscription: matchingSubscription }, userId, plan, matchingSubscription.status ?? 'active');
+    }
+  }
 }
 
 async function updateSubscription(eventName: string, data: PaystackEventData) {
