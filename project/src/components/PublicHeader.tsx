@@ -71,8 +71,10 @@ export function Footer() {
           <span>© {new Date().getFullYear()} NEXORA AI</span>
           <a href="#features" className="hover:text-white">Features</a>
           <a href="#pricing" className="hover:text-white">Pricing</a>
-          <a href="#" className="hover:text-white">Terms</a>
-          <a href="#" className="hover:text-white">Privacy</a>
+          <a href="#/terms" className="hover:text-white">Terms</a>
+          <a href="#/privacy" className="hover:text-white">Privacy</a>
+          <a href="#/refunds" className="hover:text-white">Refunds</a>
+          <a href="#/risk" className="hover:text-white">Risk</a>
         </div>
       </div>
     </footer>
