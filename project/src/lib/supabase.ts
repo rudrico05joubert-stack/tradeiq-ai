@@ -112,19 +112,19 @@ export const PLAN_FEATURES: Record<Plan, { label: string; tagline: string; price
   free: {
     label: 'Free',
     tagline: 'Try the engine',
-    price: '$0',
+    price: 'R0',
     features: ['3 analyses per day', 'Trend + RSI + EMA', 'Confidence score', 'Single chart at a time'],
   },
   pro: {
     label: 'Pro',
     tagline: 'For active traders',
-    price: '$29',
+    price: 'R399',
     features: ['Unlimited analyses', 'All 7 analysis modules', 'Risk-to-reward calculator', 'Priority processing'],
   },
   elite: {
     label: 'Elite',
     tagline: 'Full toolkit',
-    price: '$79',
+    price: 'R799',
     features: ['Unlimited analyses', 'AI Coach (1:1 guidance)', 'Trading Journal', 'Premium features & early access'],
   },
 };
