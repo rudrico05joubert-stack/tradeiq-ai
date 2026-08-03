@@ -13,6 +13,13 @@ export function paystackPlanCode(plan: PaidPlan): string {
   return code;
 }
 
+export function planFromPaystackCode(code?: string): PaidPlan | null {
+  if (!code) return null;
+  if (code === paystackPlanCode('pro')) return 'pro';
+  if (code === paystackPlanCode('elite')) return 'elite';
+  return null;
+}
+
 type RequestLike = { headers: Record<string, string | string[] | undefined> };
 
 export function getBearerToken(req: RequestLike): string {
