@@ -1,4 +1,4 @@
-import { getServiceClient, paystackRequest, planFromPaystackCode, requireUser } from './_payments.js';
+import { getServiceClient, paystackPlanCode, paystackRequest, planFromPaystackCode, requireUser, type PaidPlan } from './_payments.js';
 
 type VercelRequest = { method?: string; headers: Record<string, string | string[] | undefined> };
 type VercelResponse = { status: (code: number) => { json: (body: unknown) => void } };
@@ -8,7 +8,7 @@ type PaystackSubscription = {
   next_payment_date?: string | null;
   plan?: { plan_code?: string } | string;
 };
-type PaystackCustomer = { subscriptions?: PaystackSubscription[] };
+type PaystackCustomer = { id?: number; subscriptions?: PaystackSubscription[] };
 
 function planCode(value?: PaystackSubscription['plan']): string | undefined {
   return typeof value === 'string' ? value : value?.plan_code;
@@ -29,12 +29,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!existingSubscription) {
       return res.status(409).json({ error: 'Billing management is not available yet. Please contact support@nexoracharts.com.' });
     }
+    if (existingSubscription.plan !== 'pro' && existingSubscription.plan !== 'elite') {
+      throw new Error('INVALID_SUBSCRIPTION_PLAN');
+    }
+    const paidPlan = existingSubscription.plan as PaidPlan;
 
     let subscriptionCode = existingSubscription.subscription_code as string | null;
     if (!subscriptionCode && existingSubscription.customer_code) {
       const customer = await paystackRequest<PaystackCustomer>(`/customer/${encodeURIComponent(existingSubscription.customer_code)}`);
-      const matching = customer.subscriptions?.find((item) =>
-        planFromPaystackCode(planCode(item.plan)) === existingSubscription.plan && item.status !== 'disabled');
+      let matching = customer.subscriptions?.find((item) =>
+        planFromPaystackCode(planCode(item.plan)) === paidPlan && item.status !== 'disabled');
+      if (!matching && customer.id) {
+        const subscriptions = await paystackRequest<PaystackSubscription[]>(`/subscription?perPage=100&customer=${customer.id}`);
+        matching = subscriptions.find((item) =>
+          planFromPaystackCode(planCode(item.plan)) === paidPlan && item.status !== 'disabled');
+      }
+      if (!matching) {
+        matching = await paystackRequest<PaystackSubscription>('/subscription', {
+          method: 'POST',
+          body: JSON.stringify({
+            customer: existingSubscription.customer_code,
+            plan: paystackPlanCode(paidPlan),
+          }),
+        });
+      }
       if (matching?.subscription_code) {
         subscriptionCode = matching.subscription_code;
         const { error: updateError } = await service.from('subscriptions').update({
