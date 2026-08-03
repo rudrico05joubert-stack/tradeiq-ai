@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Crown, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { GlassCard, Spinner } from '../components/ui';
-import { startCheckout, updateProfile } from '../lib/api';
+import { manageSubscription, startCheckout, updateProfile } from '../lib/api';
 import type { Plan } from '../lib/supabase';
 import { PLAN_FEATURES } from '../lib/supabase';
 
@@ -13,6 +13,7 @@ export function SettingsView({ refreshProfile }: { refreshProfile: () => Promise
   const [savedName, setSavedName] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
+  const [managingSubscription, setManagingSubscription] = useState(false);
 
   const saveName = async () => {
     if (!user) return;
@@ -23,6 +24,15 @@ export function SettingsView({ refreshProfile }: { refreshProfile: () => Promise
       setTimeout(() => setSavedName(false), 1800);
     } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
     finally { setSavingName(false); }
+  };
+
+  const manageBilling = async () => {
+    setManagingSubscription(true); setError(null);
+    try { await manageSubscription(); }
+    catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to manage subscription.');
+      setManagingSubscription(false);
+    }
   };
 
   const checkout = async (plan: Plan) => {
@@ -59,10 +69,11 @@ export function SettingsView({ refreshProfile }: { refreshProfile: () => Promise
               <div className="flex items-center justify-between"><span className="font-display font-600 text-white">{details.label}</span>{current && <span className="chip border border-neon-500/30 bg-neon-500/15 text-[10px] text-neon-400">Current</span>}</div>
               <div className="mono mt-1 text-lg text-white">{details.price}<span className="text-xs text-ink-400">/mo</span></div>
               <ul className="mt-3 space-y-1.5">{details.features.slice(0, 3).map((feature) => <li key={feature} className="flex items-start gap-1.5 text-[11px] text-ink-300"><Check size={12} className="mt-0.5 text-neon-400" /> {feature}</li>)}</ul>
-              {!current && plan !== 'free' && <button onClick={() => checkout(plan)} disabled={checkoutPlan !== null} className="btn-outline mt-3 w-full py-2 text-xs disabled:opacity-50">{checkoutPlan === plan ? <Spinner /> : `Choose ${details.label}`}</button>}
+              {profile?.plan === 'free' && !current && plan !== 'free' && <button onClick={() => checkout(plan)} disabled={checkoutPlan !== null} className="btn-outline mt-3 w-full py-2 text-xs disabled:opacity-50">{checkoutPlan === plan ? <Spinner /> : `Choose ${details.label}`}</button>}
             </div>;
           })}
         </div>
+        {profile?.plan !== 'free' && <button onClick={manageBilling} disabled={managingSubscription} className="btn-outline mt-4 py-2 text-xs disabled:opacity-50">{managingSubscription ? <Spinner /> : 'Manage subscription'}</button>}
         <p className="mt-3 text-[11px] text-ink-500">Secure monthly checkout powered by Paystack. Your plan changes only after payment is verified.</p>
       </GlassCard>
     </div>

@@ -1,4 +1,4 @@
-import { PAYSTACK_PLANS, paystackPlanCode, paystackRequest, requireUser, type PaidPlan } from './_payments.js';
+import { PAYSTACK_PLANS, getServiceClient, paystackPlanCode, paystackRequest, requireUser, type PaidPlan } from './_payments.js';
 
 type VercelRequest = { method?: string; body?: { plan?: string }; headers: Record<string, string | string[] | undefined> };
 type VercelResponse = { status: (code: number) => { json: (body: unknown) => void } };
@@ -11,6 +11,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { user } = await requireUser(req);
     if (!user.email) return res.status(400).json({ error: 'Your account needs an email address.' });
+    const service = getServiceClient();
+    const { data: subscription, error: subscriptionError } = await service
+      .from('subscriptions')
+      .select('plan,status')
+      .eq('user_id', user.id)
+      .in('status', ['active', 'attention', 'non-renewing'])
+      .maybeSingle();
+    if (subscriptionError) throw subscriptionError;
+    if (subscription) {
+      return res.status(409).json({
+        error: subscription.plan === plan
+          ? 'This plan is already active. Use Manage subscription for billing changes.'
+          : 'Manage your current subscription before changing plans.',
+      });
+    }
     const selected = PAYSTACK_PLANS[plan];
     const callbackUrl = process.env.PAYSTACK_CALLBACK_URL || 'https://www.nexoracharts.com/?payment=callback';
     const data = await paystackRequest<{ authorization_url: string; access_code: string; reference: string }>('/transaction/initialize', {

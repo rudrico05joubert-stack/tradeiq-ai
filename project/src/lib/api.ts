@@ -22,6 +22,17 @@ export async function startCheckout(plan: 'pro' | 'elite'): Promise<void> {
   window.location.assign(data.authorization_url);
 }
 
+export async function manageSubscription(): Promise<void> {
+  const data = await authenticatedPost<{ link: string }>('/api/payments-manage', {});
+  let link: URL;
+  try { link = new URL(data.link); }
+  catch { throw new Error('Billing management returned an invalid address.'); }
+  if (link.protocol !== 'https:' || link.hostname !== 'paystack.com' || !link.pathname.startsWith('/manage/subscriptions/')) {
+    throw new Error('Billing management returned an invalid address.');
+  }
+  window.location.assign(link.toString());
+}
+
 export async function verifyPayment(reference: string): Promise<'pro' | 'elite'> {
   const data = await authenticatedPost<{ verified: boolean; plan: 'pro' | 'elite' }>('/api/payments-verify', { reference });
   if (!data.verified) throw new Error('Payment could not be verified.');
