@@ -9,6 +9,7 @@ interface Props {
 }
 
 const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp', 'image/jpg'];
+const MAX_FILE_SIZE = 3 * 1024 * 1024;
 
 export function Dropzone({ onFile, disabled, compact, hint }: Props) {
   const [drag, setDrag] = useState(false);
@@ -21,8 +22,8 @@ export function Dropzone({ onFile, disabled, compact, hint }: Props) {
       setError('Please upload a PNG, JPEG, or WebP image.');
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      setError('Image must be under 8 MB.');
+    if (file.size > MAX_FILE_SIZE) {
+      setError('Image must be under 3 MB.');
       return;
     }
     setError(null);
@@ -94,7 +95,7 @@ export function Dropzone({ onFile, disabled, compact, hint }: Props) {
         <p className="mt-1.5 text-sm text-ink-400">
           or <span className="text-neon-400 neon-underline">browse files</span>
         </p>
-        <p className="mt-3 text-[11px] text-ink-500">{hint ?? 'PNG, JPEG or WebP · up to 8 MB'}</p>
+        <p className="mt-3 text-[11px] text-ink-500">{hint ?? 'PNG, JPEG or WebP · up to 3 MB'}</p>
         <input
           ref={inputRef}
           type="file"

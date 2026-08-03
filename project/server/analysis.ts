@@ -55,7 +55,7 @@ const analysisSchema = {
 export async function analyzeChart(openai: OpenAI, { image, symbol = 'AUTO', timeframe = 'auto' }: ChartAnalysisRequest): Promise<GeneratedAnalysis> {
   if (!image || !/^data:image\/(png|jpe?g|webp);base64,/i.test(image)) throw new Error('Please upload a PNG, JPEG, or WebP chart image.');
   const payload = image.slice(image.indexOf(',') + 1);
-  if (Math.ceil(payload.length * 0.75) > 8 * 1024 * 1024) throw new Error('Chart image must be smaller than 8 MB.');
+  if (Math.ceil(payload.length * 0.75) > 3 * 1024 * 1024) throw new Error('Chart image must be smaller than 3 MB.');
 
   const response = await openai.responses.create({
     model: process.env.OPENAI_MODEL || 'gpt-5.1',
