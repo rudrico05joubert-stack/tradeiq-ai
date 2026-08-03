@@ -4,6 +4,10 @@ export type Route =
   | { name: 'home' }
   | { name: 'login' }
   | { name: 'signup' }
+  | { name: 'terms' }
+  | { name: 'privacy' }
+  | { name: 'refunds' }
+  | { name: 'risk' }
   | { name: 'dashboard' }
   | { name: 'analysis'; id: string };
 
@@ -13,6 +17,10 @@ function parseHash(): Route {
   if (parts.length === 0) return { name: 'home' };
   if (parts[0] === 'login') return { name: 'login' };
   if (parts[0] === 'signup') return { name: 'signup' };
+  if (parts[0] === 'terms') return { name: 'terms' };
+  if (parts[0] === 'privacy') return { name: 'privacy' };
+  if (parts[0] === 'refunds') return { name: 'refunds' };
+  if (parts[0] === 'risk') return { name: 'risk' };
   if (parts[0] === 'dashboard') return { name: 'dashboard' };
   if (parts[0] === 'analysis' && parts[1]) return { name: 'analysis', id: parts[1] };
   return { name: 'home' };
@@ -23,6 +31,10 @@ export function routeToHash(r: Route): string {
     case 'home': return '#/';
     case 'login': return '#/login';
     case 'signup': return '#/signup';
+    case 'terms': return '#/terms';
+    case 'privacy': return '#/privacy';
+    case 'refunds': return '#/refunds';
+    case 'risk': return '#/risk';
     case 'dashboard': return '#/dashboard';
     case 'analysis': return `#/analysis/${r.id}`;
   }

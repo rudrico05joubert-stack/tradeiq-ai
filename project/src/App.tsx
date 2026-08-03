@@ -5,6 +5,7 @@ import { HomePage } from './pages/HomePage';
 import { AuthPage } from './pages/AuthPage';
 import { TradingOS, type View } from './pages/TradingOS';
 import { AnalysisPage } from './pages/AnalysisPage';
+import { LegalPage } from './pages/LegalPage';
 import { verifyPayment } from './lib/api';
 import { Spinner } from './components/ui';
 
@@ -55,6 +56,10 @@ function Router() {
     case 'home': return <HomePage />;
     case 'login': return <AuthPage mode="login" />;
     case 'signup': return <AuthPage mode="signup" />;
+    case 'terms': return <LegalPage page="terms" />;
+    case 'privacy': return <LegalPage page="privacy" />;
+    case 'refunds': return <LegalPage page="refunds" />;
+    case 'risk': return <LegalPage page="risk" />;
     case 'dashboard': return <TradingOS view={view} setView={setView} />;
     case 'analysis': return <AnalysisPage id={route.id} />;
     default: return <HomePage />;
