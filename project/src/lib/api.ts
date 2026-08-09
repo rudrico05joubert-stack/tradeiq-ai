@@ -68,7 +68,10 @@ export async function getUsageRemaining(profile: Profile | null): Promise<{ rema
 
 // ---------- Chart storage ----------
 export async function uploadChart(file: File, userId: string): Promise<string> {
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+  const extensions: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+  const ext = extensions[file.type];
+  if (!ext) throw new Error('Please upload a PNG, JPEG, or WebP chart image.');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Chart image must be smaller than 8 MB.');
   const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage.from('charts').upload(path, file, {
     cacheControl: '3600',
@@ -76,8 +79,18 @@ export async function uploadChart(file: File, userId: string): Promise<string> {
     contentType: file.type,
   });
   if (error) throw error;
-  const { data } = supabase.storage.from('charts').getPublicUrl(path);
-  return data.publicUrl;
+  return path;
+}
+
+async function signChartImage(analysis: ChartAnalysis): Promise<ChartAnalysis> {
+  if (!analysis.image_url) return analysis;
+  let path = analysis.image_url;
+  const marker = '/storage/v1/object/public/charts/';
+  const markerIndex = path.indexOf(marker);
+  if (markerIndex >= 0) path = decodeURIComponent(path.slice(markerIndex + marker.length));
+  if (/^https?:\/\//i.test(path)) return { ...analysis, image_url: '' };
+  const { data, error } = await supabase.storage.from('charts').createSignedUrl(path, 3600);
+  return { ...analysis, image_url: error ? '' : data.signedUrl };
 }
 
 // ---------- Analyses ----------
@@ -110,7 +123,7 @@ export async function insertAnalysis(row: {
     .select('*')
     .single();
   if (error) throw error;
-  return data as ChartAnalysis;
+  return signChartImage(data as ChartAnalysis);
 }
 
 export async function fetchAnalysis(id: string): Promise<ChartAnalysis | null> {
@@ -120,7 +133,7 @@ export async function fetchAnalysis(id: string): Promise<ChartAnalysis | null> {
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
-  return data as ChartAnalysis | null;
+  return data ? signChartImage(data as ChartAnalysis) : null;
 }
 
 export async function fetchRecentAnalyses(userId: string, limit = 12): Promise<ChartAnalysis[]> {
@@ -131,7 +144,7 @@ export async function fetchRecentAnalyses(userId: string, limit = 12): Promise<C
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []) as ChartAnalysis[];
+  return Promise.all(((data ?? []) as ChartAnalysis[]).map(signChartImage));
 }
 
 export async function deleteAnalysis(id: string): Promise<void> {

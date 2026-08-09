@@ -4,4 +4,6 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: { exclude: ['lucide-react'] },
+  server: { host: '127.0.0.1', strictPort: true, fs: { strict: true } },
+  preview: { host: '127.0.0.1', strictPort: true },
 });

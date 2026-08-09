@@ -7,7 +7,7 @@ interface Props {
   symbol: string;
   timeframe: string;
   imageUrl: string | null;
-  onComplete: () => void;
+  onComplete?: () => void;
   /** total animation duration across all steps, ms */
   duration?: number;
 }
@@ -38,22 +38,23 @@ export function AnalysisTerminal({ symbol, timeframe, imageUrl, onComplete, dura
     // smooth progress bar
     const start = Date.now();
     const progTimer = setInterval(() => {
-      const pct = Math.min(100, ((Date.now() - start) / duration) * 100);
+      const maximum = onComplete ? 100 : 92;
+      const pct = Math.min(maximum, ((Date.now() - start) / duration) * 100);
       setProgress(pct);
       if (pct >= 100) clearInterval(progTimer);
     }, 40);
 
-    const done = setTimeout(() => {
+    const done = onComplete ? setTimeout(() => {
       if (!completedRef.current) {
         completedRef.current = true;
-        onComplete();
+          onComplete?.();
       }
-    }, duration + 250);
+    }, duration + 250) : undefined;
 
     return () => {
       clearInterval(stepTimer);
       clearInterval(progTimer);
-      clearTimeout(done);
+      if (done) clearTimeout(done);
     };
   }, [duration, onComplete]);
 

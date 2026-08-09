@@ -24,10 +24,12 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
       setError("You've used all 3 free analyses today. Upgrade to Pro for unlimited analyses.");
       return;
     }
-    setTerminal({ imageUrl: URL.createObjectURL(file) });
+    const imageUrl = URL.createObjectURL(file);
+    setTerminal({ imageUrl });
+    void performAnalysis(imageUrl);
   };
 
-  const onTerminalComplete = async () => {
+  const performAnalysis = async (previewUrl: string) => {
     console.log("========== ANALYSIS START ==========");
   
     if (!file || !user || !profile) {
@@ -42,14 +44,15 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
   
     try {
       console.log('Sending chart to AI...');
-      const gen = await analyzeWithAI({
+      const analysisPromise = analyzeWithAI({
         file,
         symbol: symbol || 'AUTO',
         timeframe,
       });
+      const uploadPromise = uploadChart(file, user.id);
+      const [gen, imageUrl] = await Promise.all([analysisPromise, uploadPromise]);
       console.log('AI analysis received.');
       console.log("3️⃣ Uploading chart...");
-      const imageUrl = await uploadChart(file, user.id);
       console.log("✅ Upload complete");
       console.log(imageUrl);
   
@@ -88,9 +91,7 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
       await refreshProfile();
       console.log("✅ Profile refreshed");
   
-      if (terminal?.imageUrl) {
-        URL.revokeObjectURL(terminal.imageUrl);
-      }
+      URL.revokeObjectURL(previewUrl);
   
       setTerminal(null);
   
@@ -105,9 +106,7 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
       console.error("========== ERROR ==========");
       console.error(err);
   
-      if (terminal?.imageUrl) {
-        URL.revokeObjectURL(terminal.imageUrl);
-      }
+      URL.revokeObjectURL(previewUrl);
   
       setTerminal(null);
   
@@ -126,7 +125,6 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
         symbol={symbol || 'AUTO'}
         timeframe={timeframe}
         imageUrl={terminal.imageUrl}
-        onComplete={onTerminalComplete}
       />
     );
   }

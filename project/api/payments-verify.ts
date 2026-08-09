@@ -1,4 +1,4 @@
-import { PAYSTACK_PLANS, getServiceClient, paystackPlanCode, paystackRequest, requireUser, type PaidPlan } from './_payments.js';
+import { PAYSTACK_PLANS, allowServerAction, getServiceClient, paystackPlanCode, paystackRequest, requireUser, type PaidPlan } from './_payments.js';
 
 type VercelRequest = { method?: string; body?: { reference?: string }; headers: Record<string, string | string[] | undefined> };
 type VercelResponse = { status: (code: number) => { json: (body: unknown) => void } };
@@ -11,6 +11,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { user } = await requireUser(req);
+    if (!await allowServerAction(user.id, 'payment_verify')) return res.status(429).json({ error: 'Too many verification attempts. Please wait a few minutes.' });
+    const service = getServiceClient();
+    const { data: existing, error: existingError } = await service.from('payments')
+      .select('plan,status').eq('reference', reference).eq('user_id', user.id).maybeSingle();
+    if (existingError) throw existingError;
+    // A previously recorded reference is informational only. Never use an old
+    // payment to restore access after a subscription was cancelled.
+    if (existing?.status === 'success' && (existing.plan === 'pro' || existing.plan === 'elite')) {
+      return res.status(200).json({ verified: true, plan: existing.plan });
+    }
     const transaction = await paystackRequest<PaystackTransaction>(`/transaction/verify/${encodeURIComponent(reference)}`);
     const plan = transaction.metadata?.plan as PaidPlan;
     const expected = PAYSTACK_PLANS[plan];
@@ -20,7 +30,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       && transaction.amount === expected.amount && transaction.currency === expected.currency;
     if (!valid || transactionPlanCode !== paystackPlanCode(plan)) return res.status(400).json({ error: 'This payment could not be verified.' });
 
-    const service = getServiceClient();
     const { error: paymentError } = await service.from('payments').upsert({
       reference, user_id: user.id, plan, amount: transaction.amount,
       currency: transaction.currency, status: transaction.status,
