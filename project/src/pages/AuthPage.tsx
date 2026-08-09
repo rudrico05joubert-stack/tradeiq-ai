@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Mail, Lock, User as UserIcon, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, ArrowRight, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { navigate } from '../lib/router';
 import { useAuth } from '../lib/auth';
@@ -14,11 +14,9 @@ export function AuthPage({ mode }: { mode: Mode }) {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const isRecovery = new URLSearchParams(window.location.search).get('recovery') === '1';
 
-  if (user && !isRecovery) {
+  if (user) {
     navigate({ name: 'dashboard' });
     return null;
   }
@@ -28,28 +26,22 @@ export function AuthPage({ mode }: { mode: Mode }) {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    setNotice(null);
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (password.length < 12) {
+      setError('Password must be at least 12 characters.');
       return;
     }
     setLoading(true);
     try {
-      if (isRecovery) {
-        const { error: updateError } = await supabase.auth.updateUser({ password });
-        if (updateError) throw updateError;
-        window.history.replaceState({}, '', `${window.location.pathname}#/login`);
-        await supabase.auth.signOut();
-        setNotice('Password updated. You can now sign in.');
-      } else if (isSignup) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
+      if (isSignup) {
+        const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { display_name: displayName || email.split('@')[0] } },
         });
         if (signUpError) throw signUpError;
-        if (data.session) navigate({ name: 'dashboard' });
-        else setNotice('Check your email and click the confirmation link, then return here to sign in.');
+        // The profile is created by the handle_new_user trigger. Production
+        // Supabase must require email confirmation before granting a session.
+        navigate({ name: 'dashboard' });
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
@@ -60,26 +52,12 @@ export function AuthPage({ mode }: { mode: Mode }) {
       const friendly = msg.includes('Invalid credentials') || msg.includes('Invalid login')
         ? 'Incorrect email or password.'
         : msg.includes('already registered') || msg.includes('already been registered')
-        ? 'An account with this email already exists.'
+        ? 'If this address can be used, check your email for the next step.'
         : msg;
       setError(friendly);
     } finally {
       setLoading(false);
     }
-  };
-
-  const requestPasswordReset = async () => {
-    setError(null); setNotice(null);
-    if (!email.trim()) { setError('Enter your email address first.'); return; }
-    setLoading(true);
-    try {
-      const redirectTo = `${window.location.origin}/?recovery=1#/login`;
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
-      if (resetError) throw resetError;
-      setNotice('If an account exists for that email, a password-reset link is on its way.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to send the reset email.');
-    } finally { setLoading(false); }
   };
 
   return (
@@ -90,15 +68,15 @@ export function AuthPage({ mode }: { mode: Mode }) {
           <div className="mb-8 flex flex-col items-center text-center">
             <Logo size={40} withText={false} />
             <h1 className="mt-5 font-display text-3xl font-700 tracking-tight text-white">
-              {isRecovery ? 'Choose a new password' : isSignup ? 'Create your account' : 'Welcome back'}
+              {isSignup ? 'Create your account' : 'Welcome back'}
             </h1>
             <p className="mt-2 text-sm text-ink-400">
-              {isRecovery ? 'Enter a secure password for your NEXORA account.' : isSignup ? 'Start analyzing charts with AI in minutes.' : 'Sign in to access your dashboard.'}
+              {isSignup ? 'Start analyzing charts with AI in minutes.' : 'Sign in to access your dashboard.'}
             </p>
           </div>
 
           <form onSubmit={submit} className="glass space-y-4 p-6">
-            {isSignup && !isRecovery && (
+            {isSignup && (
               <div>
                 <label className="field-label">Display name</label>
                 <div className="relative">
@@ -114,7 +92,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
                 </div>
               </div>
             )}
-            {!isRecovery && <div>
+            <div>
               <label className="field-label">Email</label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400" />
@@ -128,7 +106,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
                   autoComplete="email"
                 />
               </div>
-            </div>}
+            </div>
             <div>
               <label className="field-label">Password</label>
               <div className="relative">
@@ -140,7 +118,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="input pl-10"
-                  autoComplete={isSignup || isRecovery ? 'new-password' : 'current-password'}
+                  autoComplete={isSignup ? 'new-password' : 'current-password'}
                 />
               </div>
             </div>
@@ -152,29 +130,17 @@ export function AuthPage({ mode }: { mode: Mode }) {
               </div>
             )}
 
-            {notice && (
-              <div className="flex items-start gap-2 rounded-lg border border-neon-500/30 bg-neon-500/10 px-3 py-2.5 text-xs text-neon-400">
-                <CheckCircle size={14} className="mt-0.5 shrink-0" />
-                <span>{notice}</span>
-              </div>
-            )}
-
             <button type="submit" disabled={loading} className="btn-neon w-full">
               {loading ? <Spinner /> : (
                 <>
-                  {isRecovery ? 'Update password' : isSignup ? 'Create account' : 'Sign in'}
+                  {isSignup ? 'Create account' : 'Sign in'}
                   <ArrowRight size={16} />
                 </>
               )}
             </button>
-            {!isSignup && !isRecovery && (
-              <button type="button" onClick={requestPasswordReset} disabled={loading} className="w-full text-center text-xs text-ink-400 hover:text-neon-400 disabled:opacity-50">
-                Forgot your password?
-              </button>
-            )}
           </form>
 
-          {!isRecovery && <p className="mt-6 text-center text-sm text-ink-400">
+          <p className="mt-6 text-center text-sm text-ink-400">
             {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
             <button
               onClick={() => navigate({ name: isSignup ? 'login' : 'signup' })}
@@ -182,7 +148,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
             >
               {isSignup ? 'Log in' : 'Sign up'}
             </button>
-          </p>}
+          </p>
         </div>
       </main>
     </div>

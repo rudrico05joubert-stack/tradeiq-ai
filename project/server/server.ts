@@ -40,12 +40,12 @@ app.post('/api/analyze-chart', async (req, res) => {
     const analysis = await analyzeChart(openai, req.body);
     return res.status(200).json(analysis);
   } catch (error) {
-    console.error('Chart analysis failed:', error);
-    const message = error instanceof Error ? error.message : 'Unable to analyze this chart.';
-    return res.status(500).json({ error: message });
+    console.error('Chart analysis failed:', error instanceof Error ? error.message : 'Unknown error');
+    return res.status(500).json({ error: 'Unable to analyze this chart. Please try again.' });
   }
 });
 
-app.listen(3001, () => {
+// The standalone server is a local development helper, not a public API.
+app.listen(3001, '127.0.0.1', () => {
   console.log(`AI server running on http://localhost:3001 (OpenAI key: ${openai ? 'loaded' : 'missing'})`);
 });

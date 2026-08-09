@@ -23,16 +23,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
   if (authError || !user) return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
 
-  const { data: allowed, error: quotaError } = await supabase.rpc('consume_analysis_quota');
-  if (quotaError) return res.status(503).json({ error: 'Usage checks are temporarily unavailable.' });
-  if (!allowed) return res.status(429).json({ error: 'Daily analysis limit reached. Try again tomorrow.' });
-
+  let reservationId: string | null = null;
   try {
-    const analysis = await analyzeChart(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), req.body as never);
+    // Reserve before calling OpenAI. This prevents over-limit and burst requests
+    // from consuming the application's AI budget.
+    const { data: reservation, error: quotaError } = await supabase.rpc('begin_analysis_request');
+    if (quotaError) return res.status(503).json({ error: 'Usage checks are temporarily unavailable.' });
+    reservationId = typeof reservation === 'string' ? reservation : null;
+    if (!reservationId) return res.status(429).json({ error: 'Analysis limit reached. Please wait and try again.' });
+
+    const analysis = await analyzeChart(new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 45_000, maxRetries: 1 }), req.body as never);
+    const { error: finishError } = await supabase.rpc('finish_analysis_request', {
+      reservation_id: reservationId,
+      p_succeeded: true,
+    });
+    if (finishError) console.error('Unable to finalize analysis reservation:', finishError.message);
     return res.status(200).json(analysis);
   } catch (error) {
+    if (reservationId) {
+      const { error: releaseError } = await supabase.rpc('finish_analysis_request', {
+        reservation_id: reservationId,
+        p_succeeded: false,
+      });
+      if (releaseError) console.error('Unable to release analysis reservation:', releaseError.message);
+    }
     console.error('Chart analysis failed:', error instanceof Error ? error.message : 'Unknown error');
-    const message = error instanceof Error ? error.message : 'Unable to analyze this chart.';
-    return res.status(500).json({ error: message });
+    return res.status(500).json({ error: 'Unable to analyze this chart. Please try again.' });
   }
 }

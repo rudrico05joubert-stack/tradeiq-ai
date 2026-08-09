@@ -63,6 +63,7 @@ export function paystackSecret(): string {
 export async function paystackRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`https://api.paystack.co${path}`, {
     ...init,
+    signal: AbortSignal.timeout(15_000),
     headers: {
       Authorization: `Bearer ${paystackSecret()}`,
       'Content-Type': 'application/json',
@@ -74,4 +75,16 @@ export async function paystackRequest<T>(path: string, init?: RequestInit): Prom
     throw new Error(payload.message || 'Paystack request failed');
   }
   return payload.data;
+}
+
+export async function allowServerAction(userId: string, action: 'payment_initialize' | 'payment_verify' | 'payment_manage'): Promise<boolean> {
+  const service = getServiceClient();
+  const { error: insertError } = await service.from('api_rate_events').insert({ user_id: userId, action });
+  if (insertError) throw insertError;
+  const { count, error } = await service.from('api_rate_events')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId).eq('action', action)
+    .gte('created_at', new Date(Date.now() - 10 * 60_000).toISOString());
+  if (error) throw error;
+  return (count ?? 0) <= 5;
 }

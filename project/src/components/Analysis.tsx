@@ -4,7 +4,7 @@ export function DirectionBadge({ direction, size = 'md' }: { direction: Directio
   const map = {
     buy: { label: 'BULLISH', cls: 'bg-neon-500/15 text-neon-400 border-neon-500/40' },
     sell: { label: 'BEARISH', cls: 'bg-bear-500/15 text-bear-400 border-bear-500/40' },
-    neutral: { label: 'WAIT', cls: 'bg-warn-500/15 text-warn-400 border-warn-500/40' },
+    neutral: { label: 'NO TRADE', cls: 'bg-warn-500/15 text-warn-400 border-warn-500/40' },
   } as const;
   const m = map[direction];
   const pad = size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs';

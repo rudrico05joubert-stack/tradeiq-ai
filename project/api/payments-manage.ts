@@ -1,4 +1,4 @@
-import { getServiceClient, paystackPlanCode, paystackRequest, planFromPaystackCode, requireUser, type PaidPlan } from './_payments.js';
+import { allowServerAction, getServiceClient, paystackPlanCode, paystackRequest, planFromPaystackCode, requireUser, type PaidPlan } from './_payments.js';
 
 type VercelRequest = { method?: string; headers: Record<string, string | string[] | undefined> };
 type VercelResponse = { status: (code: number) => { json: (body: unknown) => void } };
@@ -18,6 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const { user } = await requireUser(req);
+    if (!await allowServerAction(user.id, 'payment_manage')) return res.status(429).json({ error: 'Too many billing requests. Please wait a few minutes.' });
     const service = getServiceClient();
     const { data: existingSubscription, error } = await service
       .from('subscriptions')
