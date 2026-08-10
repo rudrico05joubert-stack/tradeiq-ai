@@ -9,6 +9,7 @@
     "build": "vite build --config vite.config.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test:analysis-safety": "tsx server/analysis-safety.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.server.json"
   },
   "dependencies": {
