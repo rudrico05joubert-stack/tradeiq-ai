@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import type { GeneratedAnalysis } from '../src/lib/engine';
+import { enforceAnalysisSafety } from './analysis-safety.js';
 
 export type ChartAnalysisRequest = { image: string; symbol?: string; timeframe?: string };
 
@@ -66,15 +67,16 @@ export async function analyzeChart(openai: OpenAI, { image, symbol = 'AUTO', tim
       { role: 'user', content: [
       { type: 'input_text', text: `Analyze this ${safeSymbol} trading chart on the ${safeTimeframe} timeframe.
 
-Read the chart from left to right and give the greatest weight to the rightmost fully formed visible candles. Explicitly inspect the latest candles for displacement: an unusually large bearish drop, bullish spike, long impulse candle, gap, or sharp break of structure must be stated in the reasons and detailed explanation and must materially affect trend, momentum, confidence, and risk.
+Read the chart from left to right and give the greatest weight to the rightmost fully formed visible candles. Explicitly inspect the latest candles for displacement: an unusually large bearish drop, bullish spike, long impulse candle, gap, or sharp break of structure must be stated in the reasons and detailed explanation and must materially affect trend, momentum, confidence, and risk. Never recommend entering immediately after an oversized impulse. Require a visible retracement/retest plus rejection or continuation confirmation; otherwise direction MUST be neutral.
 
 market_trend describes visible price structure and MUST begin with exactly "Bullish:", "Bearish:", or "Ranging:". direction is the current action recommendation: buy, sell, or neutral. A neutral direction means there is no sufficiently safe entry now; it does not mean the visible market trend is flat. Do not default to neutral merely because the move has already started. For synthetic indices and M1 charts, distinguish the visible bias from whether chasing the latest impulse is safe.
 
-Base every claim on visible evidence. Do not invent exact indicator readings when an indicator is not visible, do not predict an unseen future crash or spike, and do not claim certainty from a static screenshot. If the chart is unclear or lacks a valid entry, use direction "neutral", conservative scores, and explain the specific evidence that is missing or risky. Price levels must come from the visible price scale and remain internally consistent with the direction. Overlay coordinates are normalized from 0 to 1. This is educational decision support, not financial advice.` },
+Base every claim on visible evidence. Do not invent exact indicator readings when an indicator is not visible, do not predict an unseen future crash or spike, and do not claim certainty from a static screenshot. If the chart is unclear or lacks a valid entry, use direction "neutral", conservative scores, and explain the specific evidence that is missing or risky. A directional recommendation requires confidence >= 70, trend_strength >= 45, momentum_score >= 45, risk_score <= 65, reward-to-risk >= 1.5, and internally consistent levels. On M1-M5 it requires confidence >= 75, trend_strength >= 55, momentum_score >= 55, and reward-to-risk >= 1.8. If any requirement fails, direction MUST be neutral and setup_grade MUST be C. Price levels must come from the visible price scale and remain internally consistent with the direction. Overlay coordinates are normalized from 0 to 1. This is educational decision support, not financial advice.` },
       { type: 'input_image', image_url: image, detail: 'high' },
     ] }],
     text: { format: { type: 'json_schema', name: 'chart_analysis', strict: true, schema: analysisSchema } },
   });
   if (!response.output_text) throw new Error('The AI returned no analysis. Please try another chart.');
-  return JSON.parse(response.output_text) as GeneratedAnalysis;
+  const generated = JSON.parse(response.output_text) as GeneratedAnalysis;
+  return enforceAnalysisSafety(generated, { symbol: safeSymbol, timeframe: safeTimeframe });
 }
