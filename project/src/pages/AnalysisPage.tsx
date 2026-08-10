@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, AlertCircle, BookOpen, TrendingUp, Activity, Gauge, Scale, Sparkles, Shield, Target, CandlestickChart } from 'lucide-react';
+import { ArrowLeft, AlertCircle, BookOpen, ChevronDown, Gauge, Scale, Shield, Target } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { navigate } from '../lib/router';
 import { fetchAnalysis, insertJournal } from '../lib/api';
 import type { ChartAnalysis } from '../lib/supabase';
 import { fmtPrice, fmtRR, fmtDateTime } from '../lib/format';
-import { Logo, Spinner, GlassCard } from '../components/ui';
+import { Spinner, GlassCard } from '../components/ui';
 import { DirectionBadge, ProgressBar, GradeBadge, RiskScoreBar } from '../components/Analysis';
-import { RadialGauge, LinearGauge } from '../components/Gauges';
+import { LinearGauge } from '../components/Gauges';
 import { ChartOverlay } from '../components/ChartOverlay';
 
 export function AnalysisPage({ id }: { id: string }) {
@@ -20,282 +20,86 @@ export function AnalysisPage({ id }: { id: string }) {
 
   if (loading || !user || analysis === 'loading') return <div className="flex min-h-screen items-center justify-center"><Spinner size={28} /></div>;
   if (analysis === 'error' || !analysis) {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-5">
-        <GlassCard className="max-w-md p-8 text-center">
-          <AlertCircle size={28} className="mx-auto text-bear-400" />
-          <p className="mt-3 text-sm text-ink-200">We couldn't load this analysis.</p>
-          <button onClick={() => navigate({ name: 'dashboard' })} className="btn-outline mt-4">Back to dashboard</button>
-        </GlassCard>
-      </div>
-    );
+    return <div className="flex min-h-screen items-center justify-center px-5"><GlassCard className="max-w-md p-8 text-center"><AlertCircle size={28} className="mx-auto text-bear-400" /><p className="mt-3 text-sm text-ink-200">We couldn't load this analysis.</p><button onClick={() => navigate({ name: 'dashboard' })} className="btn-outline mt-4">Back to dashboard</button></GlassCard></div>;
   }
 
   const a = analysis;
+  const isNoTrade = a.direction === 'neutral';
   const saveToJournal = async () => {
-    if (!user) return;
+    if (!user || isNoTrade) return;
     await insertJournal({ user_id: user.id, analysis_id: a.id, symbol: a.symbol, direction: a.direction, entry: a.entry, stop_loss: a.stop_loss, take_profit: a.take_profit, outcome: 'pending', pnl: null, notes: '', executed_at: new Date().toISOString() });
     setSavedToJournal(true);
   };
 
-  const gradeLabel = a.direction === 'neutral'
-    ? 'NO TRADE — safety gate active'
-    : a.setup_grade
-    ? (a.setup_grade === 'A+' ? 'Elite setup' : a.setup_grade === 'A' ? 'High-quality setup' : a.setup_grade === 'B' ? 'Acceptable setup' : 'Marginal setup')
-    : '—';
+  const actionTitle = isNoTrade ? 'WAIT — DO NOT ENTER' : a.direction === 'buy' ? 'BUY SETUP' : 'SELL SETUP';
+  const actionText = isNoTrade
+    ? 'NEXORA did not find a safe entry. Stay out and upload a fresh chart after the next structure or candle close.'
+    : `Only consider this ${a.direction} near ${fmtPrice(a.entry)}. Exit if the stop at ${fmtPrice(a.stop_loss)} is reached.`;
+  const keyReasons = a.reasons.filter(Boolean).slice(0, 3);
 
   return (
     <div className="min-h-screen animate-fade-in">
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute left-1/2 top-0 h-[420px] w-[760px] -translate-x-1/2 rounded-full bg-neon-500/[0.07] blur-[130px]" />
-      </div>
+      <div className="pointer-events-none fixed inset-0 -z-10"><div className="absolute left-1/2 top-0 h-[420px] w-[760px] -translate-x-1/2 rounded-full bg-neon-500/[0.06] blur-[130px]" /></div>
 
-      {/* Terminal top bar */}
-      <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-ink-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-5 py-3">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate({ name: 'dashboard' })} className="flex items-center gap-2 text-sm text-ink-300 hover:text-white">
-              <ArrowLeft size={16} /> <span className="hidden sm:inline">Back</span>
-            </button>
-            <div className="hidden h-5 w-px bg-white/10 sm:block" />
-            <div className="flex items-center gap-2.5">
-              <span className="mono text-lg font-700 text-white">{a.symbol}</span>
-              <DirectionBadge direction={a.direction} size="sm" />
-              {a.setup_grade && <GradeBadge grade={a.setup_grade} size="sm" />}
-              <span className="hidden text-[11px] text-ink-400 md:inline">· {a.timeframe.toUpperCase()} · {fmtDateTime(a.created_at)}</span>
-            </div>
-          </div>
+      <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-ink-950/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between px-5 py-3">
           <div className="flex items-center gap-3">
-            <span className="hidden items-center gap-1.5 text-[11px] text-ink-400 lg:flex">
-              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-pulseDot rounded-full bg-neon-400 opacity-70" /><span className="relative inline-flex h-2 w-2 rounded-full bg-neon-500" /></span>
-              <span className="mono">ANALYSIS COMPLETE</span>
-            </span>
-            <Logo size={28} withText={false} />
-            <button onClick={saveToJournal} disabled={savedToJournal || a.direction === 'neutral'} className={savedToJournal || a.direction === 'neutral' ? 'btn-outline' : 'btn-neon'}>
-              {savedToJournal ? <><BookOpen size={15} /> Saved</> : <><BookOpen size={15} /> Log</>}
-            </button>
+            <button onClick={() => navigate({ name: 'dashboard' })} className="flex items-center gap-2 text-sm text-ink-300 hover:text-white"><ArrowLeft size={16} /> Back</button>
+            <div className="hidden h-5 w-px bg-white/10 sm:block" />
+            <div><div className="mono font-700 text-white">{a.symbol}</div><div className="text-[11px] text-ink-400">{a.timeframe.toUpperCase()} · {fmtDateTime(a.created_at)}</div></div>
           </div>
+          {!isNoTrade && <button onClick={saveToJournal} disabled={savedToJournal} className={savedToJournal ? 'btn-outline' : 'btn-neon'}>{savedToJournal ? <><BookOpen size={15} /> Saved</> : <><BookOpen size={15} /> Log trade</>}</button>}
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-5 py-6 pb-24">
-        {/* Disclaimer bar */}
-        <GlassCard className="mb-6 overflow-hidden">
-  <div className="relative p-10 text-center">
+      <main className="mx-auto max-w-[1200px] px-5 py-6 pb-24">
+        <GlassCard className={`overflow-hidden border ${isNoTrade ? 'border-warn-500/30' : a.direction === 'buy' ? 'border-neon-500/30' : 'border-bear-500/30'}`}>
+          <div className="grid gap-6 p-6 md:grid-cols-[1fr_auto] md:p-8">
+            <div>
+              <div className="flex flex-wrap items-center gap-2"><DirectionBadge direction={a.direction} />{a.setup_grade && <GradeBadge grade={a.setup_grade} size="sm" />}</div>
+              <p className="mt-5 text-xs font-700 uppercase tracking-[0.2em] text-ink-400">What should I do?</p>
+              <h1 className={`mt-2 font-display text-4xl font-800 tracking-tight sm:text-5xl ${isNoTrade ? 'text-warn-400' : a.direction === 'buy' ? 'text-neon-400' : 'text-bear-400'}`}>{actionTitle}</h1>
+              <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-100">{actionText}</p>
+            </div>
+            <div className="min-w-[150px] rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 text-center md:self-center">
+              <div className="text-xs uppercase tracking-wider text-ink-400">Confidence</div>
+              <div className="mono mt-1 text-4xl font-700 text-white">{a.confidence}<span className="text-lg text-ink-400">%</span></div>
+              <div className="mt-3"><ProgressBar value={a.confidence} /></div>
+            </div>
+          </div>
+        </GlassCard>
 
-    {/* Background Glow */}
-    <div className="absolute inset-0 bg-gradient-to-r from-neon-500/5 via-transparent to-neon-500/5" />
-
-    <div className="relative">
-
-      <div className="inline-flex items-center gap-2 rounded-full border border-neon-500/20 bg-neon-500/10 px-4 py-1">
-        <Sparkles size={14} className="text-neon-400" />
-        <span className="text-xs font-medium tracking-[0.25em] uppercase text-neon-400">
-          NEXORA AI
-        </span>
-      </div>
-
-      <p className="mt-5 text-xs uppercase tracking-[0.35em] text-ink-500">
-        Market Intelligence Report
-      </p>
-
-      <h1
-        className={`mt-6 font-display text-7xl font-700 tracking-tight ${
-          a.direction === 'buy'
-            ? 'text-neon-400'
-            : a.direction === 'sell'
-            ? 'text-bear-400'
-            : 'text-warn-400'
-        }`}
-      >
-        {a.direction === 'neutral' ? 'NO TRADE' : a.direction.toUpperCase()}
-      </h1>
-
-      <div className="mt-6 flex justify-center">
-        {a.setup_grade && <GradeBadge grade={a.setup_grade} size="lg" />}
-      </div>
-
-      <div className="mt-6">
-        <div className="text-6xl font-700 text-white">
-          {a.confidence}
-          <span className="text-3xl text-ink-400">%</span>
-        </div>
-
-        <p className="mt-2 text-sm uppercase tracking-[0.25em] text-ink-400">
-          AI Confidence Score
-        </p>
-      </div>
-
-      <div className="mx-auto mt-6 max-w-md">
-        <ProgressBar value={a.confidence} />
-      </div>
-
-      <p className="mt-6 text-lg font-medium text-white">
-        {gradeLabel}
-      </p>
-
-      <p className="mt-2 text-sm text-ink-400">
-        Generated {fmtDateTime(a.created_at)}
-      </p>
-
-    </div>
-  </div>
- 
-</GlassCard>
-        <div className="mb-5 flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11px] text-ink-400">
-          <Shield size={13} className="shrink-0 text-neon-400" />
-          Decision-support analysis with confidence levels — not a prediction or guarantee of outcome. Manage risk and invalidate the thesis on a clean close beyond the stop.
-        </div>
-
-        {/* Top grid: chart (left, wide) + gauges rail (right) */}
-        <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
-          {/* LEFT: chart + indicators + explanation */}
+        <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_340px]">
           <div className="space-y-5">
-            {a.image_url && a.overlays ? (
-              <ChartOverlay imageUrl={a.image_url} overlays={a.overlays} entry={a.direction === 'neutral' ? null : a.entry} stopLoss={a.direction === 'neutral' ? null : a.stop_loss} takeProfit={a.direction === 'neutral' ? null : a.take_profit} />
-            ) : (
-              <GlassCard className="overflow-hidden">
-                {a.image_url && <img src={a.image_url} alt={a.symbol} className="w-full max-h-[460px] object-contain bg-ink-900" />}
-              </GlassCard>
-            )}
+            {a.image_url && a.overlays ? <ChartOverlay imageUrl={a.image_url} overlays={a.overlays} entry={isNoTrade ? null : a.entry} stopLoss={isNoTrade ? null : a.stop_loss} takeProfit={isNoTrade ? null : a.take_profit} /> : <GlassCard className="overflow-hidden">{a.image_url && <img src={a.image_url} alt={a.symbol} className="max-h-[560px] w-full bg-ink-900 object-contain" />}</GlassCard>}
 
-            {/* Indicator readings grid */}
-            <GlassCard className="p-5">
-              <div className="flex items-center gap-2">
-                <Gauge size={16} className="text-neon-400" />
-                <h2 className="font-display text-base font-600 text-white">Indicator readings</h2>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {Object.entries(a.indicators).map(([name, value], i) => {
-                  const Icon = [Gauge, Activity, TrendingUp, Scale, CandlestickChart][i % 5];
-                  return (
-                    <div key={name} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5">
-                      <div className="flex items-center gap-2 text-ink-300"><Icon size={14} className="text-neon-400" /><span className="text-xs">{name}</span></div>
-                      <div className="mono mt-1.5 text-lg font-600 text-white">{typeof value === 'number' ? value.toFixed(2) : value}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </GlassCard>
-
-            {/* Detailed explanation */}
             <GlassCard className="p-6">
-              <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-neon-400" />
-                <h2 className="font-display text-lg font-600 text-white">Detailed AI explanation</h2>
-              </div>
-              {a.detailed_explanation ? (
-                <p className="mt-4 max-w-3xl text-sm leading-relaxed text-ink-200">{a.detailed_explanation}</p>
-              ) : (
-                <ol className="mt-4 space-y-3">
-                  {a.reasons.map((r, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sm text-ink-200">
-                      <span className="mono mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-neon-500/10 text-[11px] font-600 text-neon-400">{i + 1}</span>
-                      <span className="leading-relaxed">{r}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </GlassCard>
-
-            {/* Key reasons */}
-            <GlassCard className="p-6">
-              <h2 className="font-display text-base font-600 text-white">Key reasons</h2>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {a.reasons.map((r, i) => (
-                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 text-sm text-ink-200">
-                    <span className="mono mt-0.5 text-neon-400">{i + 1}</span>
-                    <span className="leading-relaxed">{r}</span>
-                  </div>
-                ))}
+              <h2 className="font-display text-lg font-700 text-white">Why this decision?</h2>
+              <div className="mt-4 space-y-3">
+                {keyReasons.map((reason, index) => <div key={index} className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"><span className="mono flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neon-500/10 text-xs font-700 text-neon-400">{index + 1}</span><p className="text-sm leading-relaxed text-ink-200">{reason}</p></div>)}
               </div>
             </GlassCard>
           </div>
 
-          {/* RIGHT: terminal rail */}
           <div className="space-y-5">
-            {/* Grade + confidence header */}
-            <GlassCard className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider text-ink-400">Setup grade</div>
-                  <div className="mt-1.5 flex items-center gap-2.5">
-                    {a.setup_grade && <GradeBadge grade={a.setup_grade} size="lg" />}
-                    <div>
-                      <div className="font-display text-lg font-700 text-white">{a.setup_grade ?? '—'}</div>
-                      <div className="text-[11px] text-ink-400">{gradeLabel}</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[11px] uppercase tracking-wider text-ink-400">Confidence</div>
-                  <div className="mono mt-1.5 text-3xl font-700 text-neon-400">{a.confidence}<span className="text-base text-ink-400">%</span></div>
-                </div>
-              </div>
-              <div className="mt-4"><ProgressBar value={a.confidence} /></div>
-            </GlassCard>
+            {isNoTrade ? <GlassCard className="border border-warn-500/30 bg-warn-500/[0.06] p-6"><div className="flex items-center gap-2 text-warn-400"><Shield size={18} /><h2 className="font-display font-700">Next step</h2></div><ol className="mt-4 space-y-3 text-sm text-ink-200"><li><strong className="text-white">1.</strong> Do not open a position.</li><li><strong className="text-white">2.</strong> Wait for a clear retracement, rejection, or new structure.</li><li><strong className="text-white">3.</strong> Upload a fresh screenshot for a new decision.</li></ol></GlassCard> : <GlassCard className="p-6"><div className="flex items-center gap-2"><Target size={17} className="text-neon-400" /><h2 className="font-display font-700 text-white">Trade plan</h2></div><div className="mt-4 space-y-2.5"><LevelRow label="Entry" value={fmtPrice(a.entry)} accent="neutral" /><LevelRow label="Stop loss" value={fmtPrice(a.stop_loss)} accent="bear" /><LevelRow label="Take profit" value={fmtPrice(a.take_profit)} accent="bull" /><div className="flex items-center justify-between rounded-xl border border-neon-500/20 bg-neon-500/[0.06] px-4 py-3"><span className="flex items-center gap-2 text-sm text-ink-200"><Scale size={14} /> Risk : Reward</span><span className="mono font-700 text-neon-400">{fmtRR(a.risk_reward)}</span></div></div></GlassCard>}
 
-            {/* Animated radial gauges */}
-            <GlassCard className="p-5">
-              <div className="text-[11px] uppercase tracking-wider text-ink-400">Score matrix</div>
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div className="flex flex-col items-center"><RadialGauge value={a.confidence} label="Confidence" size={120} /></div>
-                {a.trend_strength != null && <div className="flex flex-col items-center"><RadialGauge value={a.trend_strength} label="Trend Strength" size={120} /></div>}
-                {a.momentum_score != null && <div className="flex flex-col items-center"><RadialGauge value={a.momentum_score} label="Momentum" size={120} /></div>}
-                {a.risk_score != null && <div className="flex flex-col items-center"><RadialGauge value={a.risk_score} label="Risk Score" size={120} color="#ff4d61" /></div>}
-              </div>
-              {a.risk_score != null && <div className="mt-4"><RiskScoreBar value={a.risk_score} /></div>}
-            </GlassCard>
-
-            {/* Direction + trend */}
-            <GlassCard className="p-5">
-              <div className="text-[11px] uppercase tracking-wider text-ink-400">Suggested direction</div>
-              <div className="mt-3 flex items-center justify-between">
-                <DirectionBadge direction={a.direction} />
-                <span className="text-xs text-ink-400">{a.direction === 'buy' ? 'Long bias' : a.direction === 'sell' ? 'Short bias' : 'No-trade zone'}</span>
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-ink-300">{a.market_trend}</p>
-            </GlassCard>
-
-            {/* Trade levels */}
-            {a.direction !== 'neutral' ? <GlassCard className="p-5">
-              <div className="flex items-center gap-2">
-                <Target size={15} className="text-neon-400" />
-                <h3 className="font-display text-sm font-600 text-white">Trade levels</h3>
-              </div>
-              <div className="mt-3 space-y-2.5">
-                <LevelRow label="Entry zone" value={fmtPrice(a.entry)} accent="neutral" />
-                <LevelRow label="Stop loss" value={fmtPrice(a.stop_loss)} accent="bear" />
-                <LevelRow label="Take profit" value={fmtPrice(a.take_profit)} accent="bull" />
-                <div className="my-1 divider" />
-                <div className="flex items-center justify-between rounded-xl border border-neon-500/20 bg-neon-500/[0.06] px-4 py-3">
-                  <span className="flex items-center gap-1.5 text-sm text-ink-200"><Scale size={14} className="text-neon-400" /> Risk : Reward</span>
-                  <span className="mono text-lg font-700 text-neon-400">{fmtRR(a.risk_reward)}</span>
-                </div>
-              </div>
-            </GlassCard> : <GlassCard className="border border-warn-500/30 bg-warn-500/[0.06] p-5">
-              <div className="flex items-center gap-2 text-warn-400"><Shield size={16} /><h3 className="font-display text-sm font-700">NO TRADE</h3></div>
-              <p className="mt-3 text-sm leading-relaxed text-ink-200">NEXORA blocked this setup because the evidence did not meet the minimum entry thresholds. Wait for a fresh chart with stronger confirmation.</p>
-            </GlassCard>}
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-xs leading-relaxed text-ink-400"><Shield size={14} className="mb-2 text-neon-400" />Decision support—not a guarantee. Never risk money you cannot afford to lose.</div>
           </div>
         </div>
 
-        {/* Linear gauge strip (trend + momentum + risk) */}
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
-          {a.trend_strength != null && (
-            <GlassCard className="p-5"><LinearGauge value={a.trend_strength} label="Trend Strength" mode="high-good" caption="How established the current trend is" /></GlassCard>
-          )}
-          {a.momentum_score != null && (
-            <GlassCard className="p-5"><LinearGauge value={a.momentum_score} label="Momentum Score" mode="high-good" caption="Directional momentum (RSI-normalized)" /></GlassCard>
-          )}
-          {a.risk_score != null && (
-            <GlassCard className="p-5"><LinearGauge value={a.risk_score} label="Risk Score" mode="low-good" caption="Regime risk — lower is calmer" /></GlassCard>
-          )}
-        </div>
+        <details className="group mt-6 rounded-2xl border border-white/[0.08] bg-ink-900/60">
+          <summary className="flex cursor-pointer list-none items-center justify-between p-5 text-sm font-700 text-white"><span className="flex items-center gap-2"><Gauge size={16} className="text-neon-400" />View advanced analysis</span><ChevronDown size={17} className="text-ink-400 transition-transform group-open:rotate-180" /></summary>
+          <div className="border-t border-white/[0.06] p-5">
+            <div className="grid gap-4 md:grid-cols-3">{a.trend_strength != null && <GlassCard className="p-4"><LinearGauge value={a.trend_strength} label="Trend Strength" mode="high-good" caption="How established the trend is" /></GlassCard>}{a.momentum_score != null && <GlassCard className="p-4"><LinearGauge value={a.momentum_score} label="Momentum" mode="high-good" caption="Current directional force" /></GlassCard>}{a.risk_score != null && <GlassCard className="p-4"><LinearGauge value={a.risk_score} label="Risk" mode="low-good" caption="Lower is safer" /><div className="mt-3"><RiskScoreBar value={a.risk_score} /></div></GlassCard>}</div>
+            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+              <GlassCard className="p-5"><h3 className="font-display font-700 text-white">Indicator readings</h3><div className="mt-4 grid gap-3 sm:grid-cols-2">{Object.entries(a.indicators).map(([name, value]) => <div key={name} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"><div className="text-xs text-ink-400">{name}</div><div className="mono mt-1 font-600 text-white">{typeof value === 'number' ? value.toFixed(2) : value}</div></div>)}</div></GlassCard>
+              <GlassCard className="p-5"><h3 className="font-display font-700 text-white">Full AI explanation</h3><p className="mt-4 text-sm leading-relaxed text-ink-200">{a.detailed_explanation || a.market_trend}</p></GlassCard>
+            </div>
+          </div>
+        </details>
 
-        <p className="mt-8 text-center text-[11px] text-ink-500">
-          AI-generated analysis for educational purposes only · Not financial advice · Trading involves substantial risk
-        </p>
+        <p className="mt-8 text-center text-[11px] text-ink-500">AI-generated educational analysis · Not financial advice · Trading involves substantial risk</p>
       </main>
     </div>
   );
@@ -303,10 +107,5 @@ export function AnalysisPage({ id }: { id: string }) {
 
 function LevelRow({ label, value, accent }: { label: string; value: string; accent: 'bull' | 'bear' | 'neutral' }) {
   const color = accent === 'bull' ? 'text-neon-400' : accent === 'bear' ? 'text-bear-400' : 'text-white';
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
-      <span className="text-xs text-ink-400">{label}</span>
-      <span className={`mono text-sm font-600 ${color}`}>{value}</span>
-    </div>
-  );
+  return <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-2.5"><span className="text-xs text-ink-400">{label}</span><span className={`mono text-sm font-600 ${color}`}>{value}</span></div>;
 }
