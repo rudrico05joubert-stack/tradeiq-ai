@@ -23,6 +23,19 @@ assert.ok(failedCrashTrade.confidence <= 59);
 assert.equal(failedCrashTrade.overlays.entryZone, null);
 assert.match(failedCrashTrade.reasons[0], /NO TRADE safety gate/);
 
+const autoCrashBuyBeforeDrop = enforceAnalysisSafety(fixture({
+  market_trend: 'Bullish: staircase rise is visible after the prior crash.',
+  direction: 'buy', confidence: 72, setup_grade: 'A', trend_strength: 82,
+  momentum_score: 74, risk_score: 25, entry: 5668.5, stop_loss: 5662,
+  take_profit: 5676, risk_reward: 1.15,
+  reasons: ['Price is forming a staircase of small bullish candles.'],
+  detailed_explanation: 'The short-term staircase is rising, but another abrupt crash remains possible.',
+}), { symbol: 'Crash 1000 Index', timeframe: 'AUTO' });
+assert.equal(autoCrashBuyBeforeDrop.direction, 'neutral');
+assert.equal(autoCrashBuyBeforeDrop.setup_grade, 'C');
+assert.ok(autoCrashBuyBeforeDrop.confidence <= 59);
+assert.match(autoCrashBuyBeforeDrop.reasons[0], /static screenshot cannot safely authorize a long entry/i);
+
 const qualifiedSetup = enforceAnalysisSafety(fixture({
   market_trend: 'Bearish: established lower-high structure after a confirmed pullback rejection.',
   confidence: 82, setup_grade: 'A', trend_strength: 76, momentum_score: 72, risk_score: 34,
