@@ -38,7 +38,11 @@ export function AnalysisPage({ id }: { id: string }) {
     setSavedToJournal(true);
   };
 
-  const gradeLabel = a.setup_grade ? (a.setup_grade === 'A+' ? 'Elite setup' : a.setup_grade === 'A' ? 'High-quality setup' : a.setup_grade === 'B' ? 'Acceptable setup' : 'Marginal setup') : '—';
+  const gradeLabel = a.direction === 'neutral'
+    ? 'NO TRADE — safety gate active'
+    : a.setup_grade
+    ? (a.setup_grade === 'A+' ? 'Elite setup' : a.setup_grade === 'A' ? 'High-quality setup' : a.setup_grade === 'B' ? 'Acceptable setup' : 'Marginal setup')
+    : '—';
 
   return (
     <div className="min-h-screen animate-fade-in">
@@ -67,7 +71,7 @@ export function AnalysisPage({ id }: { id: string }) {
               <span className="mono">ANALYSIS COMPLETE</span>
             </span>
             <Logo size={28} withText={false} />
-            <button onClick={saveToJournal} disabled={savedToJournal} className={savedToJournal ? 'btn-outline' : 'btn-neon'}>
+            <button onClick={saveToJournal} disabled={savedToJournal || a.direction === 'neutral'} className={savedToJournal || a.direction === 'neutral' ? 'btn-outline' : 'btn-neon'}>
               {savedToJournal ? <><BookOpen size={15} /> Saved</> : <><BookOpen size={15} /> Log</>}
             </button>
           </div>
@@ -104,7 +108,7 @@ export function AnalysisPage({ id }: { id: string }) {
             : 'text-warn-400'
         }`}
       >
-        {a.direction.toUpperCase()}
+        {a.direction === 'neutral' ? 'NO TRADE' : a.direction.toUpperCase()}
       </h1>
 
       <div className="mt-6 flex justify-center">
@@ -148,7 +152,7 @@ export function AnalysisPage({ id }: { id: string }) {
           {/* LEFT: chart + indicators + explanation */}
           <div className="space-y-5">
             {a.image_url && a.overlays ? (
-              <ChartOverlay imageUrl={a.image_url} overlays={a.overlays} entry={a.entry} stopLoss={a.stop_loss} takeProfit={a.take_profit} />
+              <ChartOverlay imageUrl={a.image_url} overlays={a.overlays} entry={a.direction === 'neutral' ? null : a.entry} stopLoss={a.direction === 'neutral' ? null : a.stop_loss} takeProfit={a.direction === 'neutral' ? null : a.take_profit} />
             ) : (
               <GlassCard className="overflow-hidden">
                 {a.image_url && <img src={a.image_url} alt={a.symbol} className="w-full max-h-[460px] object-contain bg-ink-900" />}
@@ -254,7 +258,7 @@ export function AnalysisPage({ id }: { id: string }) {
             </GlassCard>
 
             {/* Trade levels */}
-            <GlassCard className="p-5">
+            {a.direction !== 'neutral' ? <GlassCard className="p-5">
               <div className="flex items-center gap-2">
                 <Target size={15} className="text-neon-400" />
                 <h3 className="font-display text-sm font-600 text-white">Trade levels</h3>
@@ -269,7 +273,10 @@ export function AnalysisPage({ id }: { id: string }) {
                   <span className="mono text-lg font-700 text-neon-400">{fmtRR(a.risk_reward)}</span>
                 </div>
               </div>
-            </GlassCard>
+            </GlassCard> : <GlassCard className="border border-warn-500/30 bg-warn-500/[0.06] p-5">
+              <div className="flex items-center gap-2 text-warn-400"><Shield size={16} /><h3 className="font-display text-sm font-700">NO TRADE</h3></div>
+              <p className="mt-3 text-sm leading-relaxed text-ink-200">NEXORA blocked this setup because the evidence did not meet the minimum entry thresholds. Wait for a fresh chart with stronger confirmation.</p>
+            </GlassCard>}
           </div>
         </div>
 
