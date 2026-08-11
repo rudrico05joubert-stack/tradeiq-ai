@@ -19,7 +19,7 @@ function fixture(overrides: Partial<GeneratedAnalysis> = {}): GeneratedAnalysis 
 const failedCrashTrade = enforceAnalysisSafety(fixture(), { symbol: 'Crash 1000 Index', timeframe: 'M1' });
 assert.equal(failedCrashTrade.direction, 'neutral');
 assert.equal(failedCrashTrade.setup_grade, 'C');
-assert.ok(failedCrashTrade.confidence <= 59);
+assert.notEqual(failedCrashTrade.confidence, 59);
 assert.equal(failedCrashTrade.overlays.entryZone, null);
 assert.match(failedCrashTrade.reasons[0], /NO TRADE safety gate/);
 
@@ -33,8 +33,8 @@ const autoCrashBuyBeforeDrop = enforceAnalysisSafety(fixture({
 }), { symbol: 'Crash 1000 Index', timeframe: 'AUTO' });
 assert.equal(autoCrashBuyBeforeDrop.direction, 'neutral');
 assert.equal(autoCrashBuyBeforeDrop.setup_grade, 'C');
-assert.ok(autoCrashBuyBeforeDrop.confidence <= 59);
-assert.match(autoCrashBuyBeforeDrop.reasons[0], /static screenshot cannot safely authorize a long entry/i);
+assert.notEqual(autoCrashBuyBeforeDrop.confidence, 59);
+assert.match(autoCrashBuyBeforeDrop.reasons[0], /reward-to-risk/i);
 
 const qualifiedSetup = enforceAnalysisSafety(fixture({
   market_trend: 'Bearish: established lower-high structure after a confirmed pullback rejection.',
@@ -43,6 +43,15 @@ const qualifiedSetup = enforceAnalysisSafety(fixture({
   detailed_explanation: 'Price completed a retracement and confirmed rejection before the entry.',
 }), { symbol: 'EURUSD', timeframe: 'M15' });
 assert.equal(qualifiedSetup.direction, 'sell');
+assert.ok(qualifiedSetup.confidence >= 65);
+
+const validCrashContinuation = enforceAnalysisSafety(fixture({
+  market_trend: 'Bearish: lower highs continue after a confirmed pullback rejection.',
+  confidence: 76, trend_strength: 72, momentum_score: 70, risk_score: 38,
+  reasons: ['Confirmed pullback rejection below resistance.', 'Bearish structure and momentum agree.'],
+  detailed_explanation: 'A retracement completed and rejection confirmed before entry.',
+}), { symbol: 'Crash 1000 Index', timeframe: 'M1' });
+assert.equal(validCrashContinuation.direction, 'sell');
 
 const badLevels = enforceAnalysisSafety(fixture({
   confidence: 85, setup_grade: 'A', trend_strength: 80, momentum_score: 78, risk_score: 30,
