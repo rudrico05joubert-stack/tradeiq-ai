@@ -6,15 +6,29 @@ const IMPULSE_LANGUAGE = /\b(impulsive?|displacement|crash candle|spike|sharp (?
 const CONFIRMATION_LANGUAGE = /\b(retest|retracement|pullback)\b[\s\S]{0,80}\b(reject(?:ion|ed)?|confirm(?:ation|ed)?|hold|failed)\b/i;
 const LOW_TIMEFRAME = /^(?:M1|M2|M3|M4|M5)$/i;
 const SYNTHETIC_SYMBOL = /\b(?:crash|boom|volatility|step|jump)\b/i;
-const CRASH_SYMBOL = /\bcrash\b/i;
-const BOOM_SYMBOL = /\bboom\b/i;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function calibrateConfidence(analysis: GeneratedAnalysis): GeneratedAnalysis {
+  const trend = clamp(analysis.trend_strength, 0, 100);
+  const momentum = clamp(analysis.momentum_score, 0, 100);
+  const risk = clamp(analysis.risk_score, 0, 100);
+  const rewardQuality = clamp((analysis.risk_reward - 1) * 18, 0, 24);
+  const confidence = analysis.direction === 'neutral'
+    ? clamp(24 + trend * 0.14 + Math.abs(momentum - 50) * 0.12 + (100 - risk) * 0.08, 20, 55)
+    : clamp(18 + trend * 0.3 + momentum * 0.2 + (100 - risk) * 0.16 + rewardQuality, 30, 95);
+
+  return { ...analysis, confidence, trend_strength: trend, momentum_score: momentum, risk_score: risk };
+}
 
 function noTrade(analysis: GeneratedAnalysis, reasons: string[]): GeneratedAnalysis {
   const gateReason = `NO TRADE safety gate: ${reasons.join(' ')}`;
   return {
     ...analysis,
     direction: 'neutral',
-    confidence: Math.min(59, analysis.confidence),
+    confidence: analysis.confidence,
     setup_grade: 'C',
     reasons: [gateReason, ...analysis.reasons].slice(0, 6),
     overlays: { ...analysis.overlays, entryZone: null, stopLoss: null, takeProfit: null },
@@ -23,33 +37,31 @@ function noTrade(analysis: GeneratedAnalysis, reasons: string[]): GeneratedAnaly
 }
 
 export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, timeframe }: SafetyGateContext): GeneratedAnalysis {
-  if (analysis.direction === 'neutral') return noTrade(analysis, ['The model did not identify a sufficiently safe directional entry.']);
+  const calibrated = calibrateConfidence(analysis);
+  if (calibrated.direction === 'neutral') return noTrade(calibrated, ['The model did not identify a sufficiently safe directional entry.']);
 
   const failures: string[] = [];
   const synthetic = SYNTHETIC_SYMBOL.test(symbol);
   // AUTO is not a safety escape hatch. Synthetic products are commonly shown on
   // M1 charts and carry abrupt tail-event risk even when the UI omits timeframe.
   const strictShortHorizon = LOW_TIMEFRAME.test(timeframe) || synthetic;
-  const combinedText = `${analysis.market_trend} ${analysis.reasons.join(' ')} ${analysis.detailed_explanation}`;
+  const combinedText = `${calibrated.market_trend} ${calibrated.reasons.join(' ')} ${calibrated.detailed_explanation}`;
 
-  const confidenceFloor = synthetic ? 80 : strictShortHorizon ? 75 : 70;
-  if (analysis.confidence < confidenceFloor) failures.push(`Confidence ${analysis.confidence}% is below the ${confidenceFloor}% directional threshold.`);
-  if (analysis.trend_strength < (strictShortHorizon ? 55 : 45)) failures.push(`Trend strength ${analysis.trend_strength}/100 is too weak.`);
-  if (analysis.momentum_score < (strictShortHorizon ? 55 : 45)) failures.push(`Momentum ${analysis.momentum_score}/100 is too weak.`);
-  if (analysis.risk_score > 65) failures.push(`Risk score ${analysis.risk_score}/100 is elevated.`);
-  if (analysis.risk_reward < (strictShortHorizon ? 1.8 : 1.5)) failures.push(`Reward-to-risk ${analysis.risk_reward.toFixed(2)} is below the required minimum.`);
+  const confidenceFloor = synthetic ? 70 : strictShortHorizon ? 68 : 65;
+  if (calibrated.confidence < confidenceFloor) failures.push(`Confidence ${calibrated.confidence}% is below the ${confidenceFloor}% directional threshold.`);
+  if (calibrated.trend_strength < (strictShortHorizon ? 45 : 40)) failures.push(`Trend strength ${calibrated.trend_strength}/100 is too weak.`);
+  if (calibrated.momentum_score < (strictShortHorizon ? 45 : 40)) failures.push(`Momentum ${calibrated.momentum_score}/100 is too weak.`);
+  if (calibrated.risk_score > 72) failures.push(`Risk score ${calibrated.risk_score}/100 is elevated.`);
+  if (calibrated.risk_reward < (strictShortHorizon ? 1.5 : 1.3)) failures.push(`Reward-to-risk ${calibrated.risk_reward.toFixed(2)} is below the required minimum.`);
 
-  if (CRASH_SYMBOL.test(symbol) && analysis.direction === 'buy') failures.push('Crash indices can drop abruptly; a static screenshot cannot safely authorize a long entry.');
-  if (BOOM_SYMBOL.test(symbol) && analysis.direction === 'sell') failures.push('Boom indices can spike abruptly; a static screenshot cannot safely authorize a short entry.');
-
-  const levelsValid = analysis.direction === 'buy'
-    ? analysis.stop_loss < analysis.entry && analysis.take_profit > analysis.entry
-    : analysis.stop_loss > analysis.entry && analysis.take_profit < analysis.entry;
+  const levelsValid = calibrated.direction === 'buy'
+    ? calibrated.stop_loss < calibrated.entry && calibrated.take_profit > calibrated.entry
+    : calibrated.stop_loss > calibrated.entry && calibrated.take_profit < calibrated.entry;
   if (!levelsValid) failures.push('Entry, stop and target are not internally consistent with the suggested direction.');
 
   const unconfirmedImpulse = IMPULSE_LANGUAGE.test(combinedText) && !CONFIRMATION_LANGUAGE.test(combinedText);
   if (unconfirmedImpulse) failures.push('The latest impulse has no confirmed retracement or rejection; entering now would chase the move.');
   if (synthetic && unconfirmedImpulse) failures.push('Synthetic-index impulses require confirmation before any directional setup.');
 
-  return failures.length > 0 ? noTrade(analysis, failures) : analysis;
+  return failures.length > 0 ? noTrade(calibrated, failures) : calibrated;
 }
