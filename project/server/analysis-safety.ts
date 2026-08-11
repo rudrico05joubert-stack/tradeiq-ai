@@ -23,13 +23,22 @@ function calibrateConfidence(analysis: GeneratedAnalysis): GeneratedAnalysis {
   return { ...analysis, confidence, trend_strength: trend, momentum_score: momentum, risk_score: risk };
 }
 
-function noTrade(analysis: GeneratedAnalysis, reasons: string[]): GeneratedAnalysis {
-  const gateReason = `NO TRADE safety gate: ${reasons.join(' ')}`;
+function inferBias(analysis: GeneratedAnalysis): GeneratedAnalysis['direction'] {
+  if (analysis.direction !== 'neutral') return analysis.direction;
+  if (/^Bearish:/i.test(analysis.market_trend)) return 'sell';
+  if (/^Bullish:/i.test(analysis.market_trend)) return 'buy';
+  return 'neutral';
+}
+
+function entryWait(analysis: GeneratedAnalysis, reasons: string[]): GeneratedAnalysis {
+  const direction = inferBias(analysis);
+  const gateReason = `ENTRY WAIT: ${reasons.join(' ')}`;
   return {
     ...analysis,
-    direction: 'neutral',
+    direction,
     confidence: analysis.confidence,
     setup_grade: 'C',
+    indicators: { ...analysis.indicators, 'Entry Ready': 0 },
     reasons: [gateReason, ...analysis.reasons].slice(0, 6),
     overlays: { ...analysis.overlays, entryZone: null, stopLoss: null, takeProfit: null },
     detailed_explanation: `${gateReason} Wait for stronger agreement and a confirmed entry structure. ${analysis.detailed_explanation}`,
@@ -38,7 +47,13 @@ function noTrade(analysis: GeneratedAnalysis, reasons: string[]): GeneratedAnaly
 
 export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, timeframe }: SafetyGateContext): GeneratedAnalysis {
   const calibrated = calibrateConfidence(analysis);
-  if (calibrated.direction === 'neutral') return noTrade(calibrated, ['The model did not identify a sufficiently safe directional entry.']);
+  if (calibrated.direction === 'neutral') {
+    const bias = inferBias(calibrated);
+    const reason = bias === 'neutral'
+      ? 'The chart does not show a reliable directional bias.'
+      : `The chart is ${bias === 'sell' ? 'bearish' : 'bullish'}, but the entry is not confirmed yet.`;
+    return entryWait(calibrated, [reason]);
+  }
 
   const failures: string[] = [];
   const synthetic = SYNTHETIC_SYMBOL.test(symbol);
@@ -63,5 +78,7 @@ export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, tim
   if (unconfirmedImpulse) failures.push('The latest impulse has no confirmed retracement or rejection; entering now would chase the move.');
   if (synthetic && unconfirmedImpulse) failures.push('Synthetic-index impulses require confirmation before any directional setup.');
 
-  return failures.length > 0 ? noTrade(calibrated, failures) : calibrated;
+  return failures.length > 0
+    ? entryWait(calibrated, failures)
+    : { ...calibrated, indicators: { ...calibrated.indicators, 'Entry Ready': 1 } };
 }

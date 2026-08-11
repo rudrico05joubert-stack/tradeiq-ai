@@ -17,11 +17,12 @@ function fixture(overrides: Partial<GeneratedAnalysis> = {}): GeneratedAnalysis 
 }
 
 const failedCrashTrade = enforceAnalysisSafety(fixture(), { symbol: 'Crash 1000 Index', timeframe: 'M1' });
-assert.equal(failedCrashTrade.direction, 'neutral');
+assert.equal(failedCrashTrade.direction, 'sell');
+assert.equal(failedCrashTrade.indicators['Entry Ready'], 0);
 assert.equal(failedCrashTrade.setup_grade, 'C');
 assert.notEqual(failedCrashTrade.confidence, 59);
 assert.equal(failedCrashTrade.overlays.entryZone, null);
-assert.match(failedCrashTrade.reasons[0], /NO TRADE safety gate/);
+assert.match(failedCrashTrade.reasons[0], /ENTRY WAIT/);
 
 const autoCrashBuyBeforeDrop = enforceAnalysisSafety(fixture({
   market_trend: 'Bullish: staircase rise is visible after the prior crash.',
@@ -31,7 +32,8 @@ const autoCrashBuyBeforeDrop = enforceAnalysisSafety(fixture({
   reasons: ['Price is forming a staircase of small bullish candles.'],
   detailed_explanation: 'The short-term staircase is rising, but another abrupt crash remains possible.',
 }), { symbol: 'Crash 1000 Index', timeframe: 'AUTO' });
-assert.equal(autoCrashBuyBeforeDrop.direction, 'neutral');
+assert.equal(autoCrashBuyBeforeDrop.direction, 'buy');
+assert.equal(autoCrashBuyBeforeDrop.indicators['Entry Ready'], 0);
 assert.equal(autoCrashBuyBeforeDrop.setup_grade, 'C');
 assert.notEqual(autoCrashBuyBeforeDrop.confidence, 59);
 assert.match(autoCrashBuyBeforeDrop.reasons[0], /reward-to-risk/i);
@@ -43,6 +45,7 @@ const qualifiedSetup = enforceAnalysisSafety(fixture({
   detailed_explanation: 'Price completed a retracement and confirmed rejection before the entry.',
 }), { symbol: 'EURUSD', timeframe: 'M15' });
 assert.equal(qualifiedSetup.direction, 'sell');
+assert.equal(qualifiedSetup.indicators['Entry Ready'], 1);
 assert.ok(qualifiedSetup.confidence >= 65);
 
 const validCrashContinuation = enforceAnalysisSafety(fixture({
@@ -52,12 +55,22 @@ const validCrashContinuation = enforceAnalysisSafety(fixture({
   detailed_explanation: 'A retracement completed and rejection confirmed before entry.',
 }), { symbol: 'Crash 1000 Index', timeframe: 'M1' });
 assert.equal(validCrashContinuation.direction, 'sell');
+assert.equal(validCrashContinuation.indicators['Entry Ready'], 1);
 
 const badLevels = enforceAnalysisSafety(fixture({
   confidence: 85, setup_grade: 'A', trend_strength: 80, momentum_score: 78, risk_score: 30,
   market_trend: 'Bearish: confirmed pullback rejection.', reasons: ['Confirmed pullback rejection.'],
   detailed_explanation: 'Retracement rejection confirmed.', stop_loss: 5650,
 }), { symbol: 'EURUSD', timeframe: 'M15' });
-assert.equal(badLevels.direction, 'neutral');
+assert.equal(badLevels.direction, 'sell');
+assert.equal(badLevels.indicators['Entry Ready'], 0);
+
+const inferredBearishBias = enforceAnalysisSafety(fixture({ direction: 'neutral' }), { symbol: 'Crash 1000 Index', timeframe: 'M1' });
+assert.equal(inferredBearishBias.direction, 'sell');
+assert.equal(inferredBearishBias.indicators['Entry Ready'], 0);
+
+const genuineNoBias = enforceAnalysisSafety(fixture({ direction: 'neutral', market_trend: 'Ranging: price is moving sideways without structure.' }), { symbol: 'EURUSD', timeframe: 'M15' });
+assert.equal(genuineNoBias.direction, 'neutral');
+assert.equal(genuineNoBias.indicators['Entry Ready'], 0);
 
 console.log('analysis safety regression tests passed');
