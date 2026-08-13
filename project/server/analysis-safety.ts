@@ -6,6 +6,8 @@ const IMPULSE_LANGUAGE = /\b(impulsive?|displacement|crash candle|spike|sharp (?
 const CONFIRMATION_LANGUAGE = /\b(retest|retracement|pullback)\b[\s\S]{0,80}\b(reject(?:ion|ed)?|confirm(?:ation|ed)?|hold|failed)\b/i;
 const LOW_TIMEFRAME = /^(?:M1|M2|M3|M4|M5)$/i;
 const SYNTHETIC_SYMBOL = /\b(?:crash|boom|volatility|step|jump)\b/i;
+const CRASH_SYMBOL = /\bcrash\b/i;
+const BOOM_SYMBOL = /\bboom\b/i;
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.round(value)));
@@ -46,7 +48,17 @@ function entryWait(analysis: GeneratedAnalysis, reasons: string[]): GeneratedAna
 }
 
 export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, timeframe }: SafetyGateContext): GeneratedAnalysis {
-  const calibrated = calibrateConfidence(analysis);
+  const restrictedDirection = CRASH_SYMBOL.test(symbol) ? 'sell' : BOOM_SYMBOL.test(symbol) ? 'buy' : null;
+  const oppositeSideBlocked = restrictedDirection !== null && analysis.direction !== restrictedDirection;
+  const policyAdjusted: GeneratedAnalysis = oppositeSideBlocked
+    ? {
+        ...analysis,
+        direction: restrictedDirection,
+        reasons: [`${CRASH_SYMBOL.test(symbol) ? 'Crash' : 'Boom'} strategy only allows ${restrictedDirection.toUpperCase()}-side setups; the opposite-side signal was blocked.`, ...analysis.reasons],
+        detailed_explanation: `Instrument policy blocked the opposite-side recommendation. ${analysis.detailed_explanation}`,
+      }
+    : analysis;
+  const calibrated = calibrateConfidence(policyAdjusted);
   if (calibrated.direction === 'neutral') {
     const bias = inferBias(calibrated);
     const reason = bias === 'neutral'
@@ -61,6 +73,8 @@ export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, tim
   // M1 charts and carry abrupt tail-event risk even when the UI omits timeframe.
   const strictShortHorizon = LOW_TIMEFRAME.test(timeframe) || synthetic;
   const combinedText = `${calibrated.market_trend} ${calibrated.reasons.join(' ')} ${calibrated.detailed_explanation}`;
+
+  if (oppositeSideBlocked) failures.push(`Wait for a confirmed ${restrictedDirection!.toUpperCase()} entry; opposite-side trades are disabled for this instrument.`);
 
   const confidenceFloor = synthetic ? 70 : strictShortHorizon ? 68 : 65;
   if (calibrated.confidence < confidenceFloor) failures.push(`Confidence ${calibrated.confidence}% is below the ${confidenceFloor}% directional threshold.`);

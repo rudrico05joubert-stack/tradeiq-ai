@@ -59,7 +59,7 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
       console.log("4️⃣ Saving analysis...");
       const saved = await insertAnalysis({
         user_id: user.id,
-        symbol: symbol || "AUTO",
+        symbol: symbol || gen.detected_symbol || "AUTO",
         timeframe,
         image_url: imageUrl,
         market_trend: gen.market_trend,
@@ -143,7 +143,7 @@ export function NewAnalysisView({ refreshProfile }: { refreshProfile: () => Prom
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <label className="field-label">Symbol (optional)</label>
-            <input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} placeholder="e.g. EURUSD" className="input" maxLength={12} />
+            <input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} placeholder="e.g. CRASH 1000 INDEX" className="input" maxLength={32} />
           </div>
           <div>
             <label className="field-label">Timeframe</label>

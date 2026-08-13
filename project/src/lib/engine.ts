@@ -1,6 +1,7 @@
 import type { ChartOverlays, Direction, SetupGrade } from './supabase';
 
 export interface GeneratedAnalysis {
+  detected_symbol?: string;
   market_trend: string;
   direction: Direction;
   confidence: number; // 0..100
