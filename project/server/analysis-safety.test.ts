@@ -32,11 +32,11 @@ const autoCrashBuyBeforeDrop = enforceAnalysisSafety(fixture({
   reasons: ['Price is forming a staircase of small bullish candles.'],
   detailed_explanation: 'The short-term staircase is rising, but another abrupt crash remains possible.',
 }), { symbol: 'Crash 1000 Index', timeframe: 'AUTO' });
-assert.equal(autoCrashBuyBeforeDrop.direction, 'buy');
+assert.equal(autoCrashBuyBeforeDrop.direction, 'sell');
 assert.equal(autoCrashBuyBeforeDrop.indicators['Entry Ready'], 0);
 assert.equal(autoCrashBuyBeforeDrop.setup_grade, 'C');
 assert.notEqual(autoCrashBuyBeforeDrop.confidence, 59);
-assert.match(autoCrashBuyBeforeDrop.reasons[0], /reward-to-risk/i);
+assert.match(autoCrashBuyBeforeDrop.reasons[0], /SELL entry/i);
 
 const qualifiedSetup = enforceAnalysisSafety(fixture({
   market_trend: 'Bearish: established lower-high structure after a confirmed pullback rejection.',
@@ -72,5 +72,19 @@ assert.equal(inferredBearishBias.indicators['Entry Ready'], 0);
 const genuineNoBias = enforceAnalysisSafety(fixture({ direction: 'neutral', market_trend: 'Ranging: price is moving sideways without structure.' }), { symbol: 'EURUSD', timeframe: 'M15' });
 assert.equal(genuineNoBias.direction, 'neutral');
 assert.equal(genuineNoBias.indicators['Entry Ready'], 0);
+
+const crashBuyBlocked = enforceAnalysisSafety(fixture({
+  direction: 'buy', market_trend: 'Bullish: a short staircase recovery is visible.',
+  confidence: 80, trend_strength: 80, momentum_score: 75, risk_score: 25,
+  entry: 5668, stop_loss: 5660, take_profit: 5684, risk_reward: 2,
+  reasons: ['Short-term candles are rising after a drop.'], detailed_explanation: 'A bullish recovery is visible.',
+}), { symbol: 'Crash 1000 Index', timeframe: 'M1' });
+assert.equal(crashBuyBlocked.direction, 'sell');
+assert.equal(crashBuyBlocked.indicators['Entry Ready'], 0);
+assert.match(crashBuyBlocked.reasons[0], /ENTRY WAIT.*SELL entry/i);
+
+const boomSellBlocked = enforceAnalysisSafety(fixture({ direction: 'sell' }), { symbol: 'Boom 1000 Index', timeframe: 'M1' });
+assert.equal(boomSellBlocked.direction, 'buy');
+assert.equal(boomSellBlocked.indicators['Entry Ready'], 0);
 
 console.log('analysis safety regression tests passed');
