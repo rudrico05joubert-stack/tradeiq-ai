@@ -12,9 +12,18 @@ const point = {
 const analysisSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['detected_symbol', 'market_trend', 'direction', 'confidence', 'setup_grade', 'risk_score', 'trend_strength', 'momentum_score', 'entry', 'stop_loss', 'take_profit', 'risk_reward', 'reasons', 'indicators', 'overlays', 'detailed_explanation'],
+  required: ['detected_symbol', 'price_scale', 'market_trend', 'direction', 'confidence', 'setup_grade', 'risk_score', 'trend_strength', 'momentum_score', 'entry', 'stop_loss', 'take_profit', 'risk_reward', 'reasons', 'indicators', 'overlays', 'detailed_explanation'],
   properties: {
     detected_symbol: { type: 'string' },
+    price_scale: { anyOf: [
+      { type: 'object', additionalProperties: false, required: ['low', 'high', 'top_y', 'bottom_y', 'latest', 'digits'], properties: {
+        low: { type: 'number' }, high: { type: 'number' },
+        top_y: { type: 'number', minimum: 0, maximum: 1 }, bottom_y: { type: 'number', minimum: 0, maximum: 1 },
+        latest: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+        digits: { type: 'integer', minimum: 0, maximum: 6 },
+      } },
+      { type: 'null' },
+    ] },
     market_trend: { type: 'string' },
     direction: { type: 'string', enum: ['buy', 'sell', 'neutral'] },
     confidence: { type: 'integer', minimum: 0, maximum: 100 },
@@ -70,13 +79,15 @@ export async function analyzeChart(openai: OpenAI, { image, symbol = 'AUTO', tim
 
 Set detected_symbol to the exact instrument name visibly printed in the chart header, or "UNKNOWN" if it cannot be read.
 
+Read at least two numeric ticks from the PRICE chart's right-hand axis (not RSI, MACD, volume, or another indicator panel). Return price_scale.low and price_scale.high as those visible bounds, top_y and bottom_y as their normalized vertical positions in the entire screenshot, latest as the last visible price label or null if unavailable, and digits as the visible price tick precision (for example 4,386.282 has 3 digits). Return price_scale null if the actual price-axis ticks or their positions are unreadable. Do not guess a price scale from the instrument name. Do not return a trade plan from a scale you cannot read.
+
 Instrument policy: for any Crash index, never return a BUY recommendation; only evaluate SELL setups because the product strategy targets the abrupt downward move. A rising staircase on Crash is preparation for a possible SELL entry, not a BUY signal. For any Boom index, apply the inverse rule: never return SELL; only evaluate BUY setups for the abrupt upward move. The server enforces this policy independently.
 
 Read the chart from left to right and give the greatest weight to the rightmost fully formed visible candles. Explicitly inspect the latest candles for displacement: an unusually large bearish drop, bullish spike, long impulse candle, gap, or sharp break of structure must be stated in the reasons and detailed explanation and must materially affect trend, momentum, confidence, and risk. Never recommend entering immediately after an oversized impulse. State the visible directional bias even when a retracement/retest is still required for entry.
 
 market_trend describes visible price structure and MUST begin with exactly "Bullish:", "Bearish:", or "Ranging:". direction is the visible directional bias: use buy for bullish bias, sell for bearish bias, and neutral only when the chart is genuinely ranging, unreadable, or has no defensible directional bias. Entry timing is evaluated separately by the server. Do not default to neutral merely because the move has already started or because entering immediately would chase it.
 
-Base every claim on visible evidence. Do not invent exact indicator readings when an indicator is not visible, do not predict an unseen future crash or spike, and do not claim certainty from a static screenshot. If the chart is unclear, use direction "neutral", conservative scores, and explain the missing evidence. Return buy or sell when visible structure supports that bias, even if the ideal entry still requires confirmation. Explain clearly when an oversized impulse should not be chased. Price levels must come from the visible price scale and remain internally consistent with the direction. Scores must vary with the evidence rather than defaulting to a habitual mid-range value; the server independently calibrates final confidence and entry readiness. Overlay coordinates are normalized from 0 to 1. This is educational decision support, not financial advice.` },
+Base every claim on visible evidence. Do not invent exact indicator readings when an indicator is not visible, do not predict an unseen future crash or spike, and do not claim certainty from a static screenshot. If the chart is unclear, use direction "neutral", conservative scores, and explain the missing evidence. Return buy or sell when visible structure supports that bias, even if the ideal entry still requires confirmation. Explain clearly when an oversized impulse should not be chased. Price levels must come from the visible price scale and remain internally consistent with the direction. Scores must vary with the evidence rather than defaulting to a habitual mid-range value; the server independently calibrates final confidence and entry readiness. Overlay coordinates are normalized from 0 to 1 across the entire screenshot. This is educational decision support, not financial advice.` },
       { type: 'input_image', image_url: image, detail: 'high' },
     ] }],
     text: { format: { type: 'json_schema', name: 'chart_analysis', strict: true, schema: analysisSchema } },
@@ -85,5 +96,7 @@ Base every claim on visible evidence. Do not invent exact indicator readings whe
   const generated = JSON.parse(response.output_text) as GeneratedAnalysis;
   const detectedSymbol = /^[A-Za-z0-9._+\- /]{1,32}$/.test(generated.detected_symbol ?? '') ? generated.detected_symbol! : 'UNKNOWN';
   const effectiveSymbol = safeSymbol === 'AUTO' ? detectedSymbol : safeSymbol;
-  return enforceAnalysisSafety({ ...generated, detected_symbol: effectiveSymbol }, { symbol: effectiveSymbol, timeframe: safeTimeframe });
+  return enforceAnalysisSafety({ ...generated, detected_symbol: detectedSymbol }, {
+    symbol: effectiveSymbol, timeframe: safeTimeframe, expectedSymbol: safeSymbol === 'AUTO' ? null : safeSymbol,
+  });
 }

@@ -1,15 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight, TrendingUp, Activity, Gauge, CandlestickChart, Layers,
   Scale, Sparkles, Check, Zap, Crown, BarChart3,
 } from 'lucide-react';
 import { PublicHeader, Footer } from '../components/PublicHeader';
 import { Dropzone } from '../components/Dropzone';
-import { Logo, SectionTag, IconBadge, GlassCard, Spinner } from '../components/ui';
+import { Logo, SectionTag, IconBadge, GlassCard } from '../components/ui';
 import { navigate } from '../lib/router';
 import { useAuth } from '../lib/auth';
-import { STEPS, generateAnalysis, imageSignature } from '../lib/engine';
-import { DirectionBadge, ProgressBar } from '../components/Analysis';
 
 const FEATURES = [
   { icon: TrendingUp, title: 'Trend Analysis', desc: 'Detects higher-high/lower-low structure and labels the dominant market regime.' },
@@ -30,25 +28,6 @@ const PLANS = [
 export function HomePage() {
   const { user } = useAuth();
   const [demoFile, setDemoFile] = useState<File | null>(null);
-  const [demoStep, setDemoStep] = useState(-1);
-  const [demoResult, setDemoResult] = useState<ReturnType<typeof generateAnalysis> | null>(null);
-  const [demoLoading, setDemoLoading] = useState(false);
-
-  const runDemo = async (file: File) => {
-    setDemoFile(file);
-    setDemoLoading(true);
-    setDemoResult(null);
-    setDemoStep(0);
-    const sig = await imageSignature(file);
-    // simulate progressive AI steps for the marketing demo
-    for (let i = 0; i < STEPS.length; i++) {
-      setDemoStep(i);
-      await new Promise((r) => setTimeout(r, 360));
-    }
-    const res = generateAnalysis({ imageSignature: sig, symbol: 'DEMO', timeframe: 'auto' });
-    setDemoResult(res);
-    setDemoLoading(false);
-  };
 
   return (
     <div className="min-h-screen">
@@ -84,33 +63,17 @@ export function HomePage() {
             <div className="animate-fade-up [animation-delay:120ms]">
               <GlassCard className="p-5">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xs font-medium uppercase tracking-wider text-ink-400">Live demo</span>
-                  {demoResult && (
-                    <button onClick={() => { setDemoFile(null); setDemoResult(null); setDemoStep(-1); }} className="text-xs text-ink-400 hover:text-white">
+                  <span className="text-xs font-medium uppercase tracking-wider text-ink-400">Chart preview</span>
+                  {demoFile && (
+                    <button onClick={() => setDemoFile(null)} className="text-xs text-ink-400 hover:text-white">
                       Reset
                     </button>
                   )}
                 </div>
-                {!demoResult ? (
-                  <>
-                    <Dropzone onFile={runDemo} hint="Drop a chart to see the AI analyze it instantly" />
-                    {demoLoading && (
-                      <div className="mt-4 space-y-2">
-                        {STEPS.map((s, i) => (
-                          <div key={s} className={`flex items-center gap-2 text-xs transition-opacity ${i <= demoStep ? 'opacity-100' : 'opacity-30'}`}>
-                            {i < demoStep ? <Check size={13} className="text-neon-400" /> : i === demoStep ? <Spinner size={13} /> : <span className="h-3 w-3" />}
-                            <span className={i <= demoStep ? 'text-ink-200' : 'text-ink-500'}>{s}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <DemoResult file={demoFile} result={demoResult} />
-                )}
+                {!demoFile ? <Dropzone onFile={setDemoFile} hint="Preview your chart here; sign in for a real analysis" /> : <DemoResult file={demoFile} signedIn={Boolean(user)} />}
               </GlassCard>
               <p className="mt-3 text-center text-[11px] text-ink-500">
-                Demo analysis is generated locally — sign up to save analyses to your account.
+                Preview only. No analysis or trade levels are generated until you sign in and analyze your chart.
               </p>
             </div>
           </div>
@@ -249,54 +212,22 @@ function PriceCard({ planId, icon: Icon, featured }: { planId: 'free' | 'pro' | 
   );
 }
 
-function DemoResult({ file, result }: { file: File | null; result: ReturnType<typeof generateAnalysis> }) {
+function DemoResult({ file, signedIn }: { file: File; signedIn: boolean }) {
+  const [imageUrl, setImageUrl] = useState('');
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setImageUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
   return (
     <div className="animate-scale-in space-y-4">
-      {file && (
-        <div className="relative overflow-hidden rounded-xl">
-          <img src={URL.createObjectURL(file)} alt="chart" className="max-h-48 w-full object-cover" />
-          <div className="absolute inset-0 scanline opacity-40" />
-        </div>
-      )}
-      <div className="flex items-center gap-4">
-        <DirectionBadge direction={result.direction} />
-        <div className="flex-1">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-ink-400">Confidence</span>
-            <span className="mono text-white">{result.confidence}%</span>
-          </div>
-          <div className="mt-1.5"><ProgressBar value={result.confidence} /></div>
-        </div>
+      <div className="relative overflow-hidden rounded-xl">
+        {imageUrl && <img src={imageUrl} alt="Uploaded trading chart preview" className="max-h-48 w-full object-contain" />}
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <Mini label="Entry" value={result.entry.toFixed(4)} />
-        <Mini label="Stop" value={result.stop_loss.toFixed(4)} />
-        <Mini label="Target" value={result.take_profit.toFixed(4)} />
-      </div>
-      <div className="flex items-center justify-between rounded-lg border border-neon-500/20 bg-neon-500/[0.06] px-3 py-2">
-        <span className="text-xs text-ink-300">Risk : Reward</span>
-        <span className="mono text-sm font-600 text-neon-400">{result.risk_reward.toFixed(2)} : 1</span>
-      </div>
-      <ul className="space-y-1.5">
-        {result.reasons.slice(0, 3).map((r, i) => (
-          <li key={i} className="flex items-start gap-2 text-xs text-ink-300">
-            <span className="mono text-neon-400">{i + 1}</span>
-            <span>{r}</span>
-          </li>
-        ))}
-      </ul>
-      <button onClick={() => navigate({ name: 'signup' })} className="btn-outline w-full">
-        Get full analyses <ArrowRight size={14} />
+      <p className="text-xs text-ink-300">This is only a preview. No price, indicator, confidence, or trade level has been calculated from this screenshot.</p>
+      <button onClick={() => navigate({ name: signedIn ? 'dashboard' : 'signup' })} className="btn-outline w-full">
+        {signedIn ? 'Analyze in dashboard' : 'Sign up for a real analysis'} <ArrowRight size={14} />
       </button>
-    </div>
-  );
-}
-
-function Mini({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-ink-400">{label}</div>
-      <div className="mono mt-0.5 text-sm text-white">{value}</div>
     </div>
   );
 }

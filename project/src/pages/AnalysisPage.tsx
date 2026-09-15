@@ -24,8 +24,9 @@ export function AnalysisPage({ id }: { id: string }) {
   }
 
   const a = analysis;
-  const hasEntryFlag = Object.prototype.hasOwnProperty.call(a.indicators ?? {}, 'Entry Ready');
-  const entryReady = hasEntryFlag ? a.indicators['Entry Ready'] === 1 : a.direction !== 'neutral';
+  // Fail closed for older saved analyses that predate price-axis validation.
+  const entryReady = a.direction !== 'neutral' && a.indicators?.['Entry Ready'] === 1 && a.indicators?.['Price Levels Verified'] === 1;
+  const priceDigits = Number.isInteger(a.indicators?.['Price Digits']) ? a.indicators['Price Digits'] : 2;
   const hasBias = a.direction !== 'neutral';
   const saveToJournal = async () => {
     if (!user || !entryReady || !hasBias) return;
@@ -41,7 +42,7 @@ export function AnalysisPage({ id }: { id: string }) {
   const actionText = !hasBias
     ? 'The chart is genuinely unclear or ranging. Upload a fresh chart after new structure forms.'
     : entryReady
-      ? `Direction: ${a.direction.toUpperCase()}. Consider entry near ${fmtPrice(a.entry)} only while the setup remains valid.`
+      ? `Direction: ${a.direction.toUpperCase()}. Consider entry near ${fmtPrice(a.entry, priceDigits)} only while the setup remains valid.`
       : `Direction: ${a.direction.toUpperCase()}. Do not chase the move; wait for the pullback or rejection that confirms a safer entry.`;
   const keyReasons = a.reasons.filter(Boolean).slice(0, 3);
 
@@ -90,7 +91,7 @@ export function AnalysisPage({ id }: { id: string }) {
           </div>
 
           <div className="space-y-5">
-            {!entryReady ? <GlassCard className="border border-warn-500/30 bg-warn-500/[0.06] p-6"><div className="flex items-center gap-2 text-warn-400"><Shield size={18} /><h2 className="font-display font-700">Entry status</h2></div><ol className="mt-4 space-y-3 text-sm text-ink-200"><li><strong className="text-white">Direction:</strong> {hasBias ? a.direction.toUpperCase() : 'UNCLEAR'}</li><li><strong className="text-white">Entry:</strong> Not confirmed yet.</li><li><strong className="text-white">Next:</strong> Wait for a pullback, rejection, or fresh structure—then upload a new screenshot.</li></ol></GlassCard> : <GlassCard className="p-6"><div className="flex items-center gap-2"><Target size={17} className="text-neon-400" /><h2 className="font-display font-700 text-white">Trade plan</h2></div><div className="mt-4 space-y-2.5"><LevelRow label="Entry" value={fmtPrice(a.entry)} accent="neutral" /><LevelRow label="Stop loss" value={fmtPrice(a.stop_loss)} accent="bear" /><LevelRow label="Take profit" value={fmtPrice(a.take_profit)} accent="bull" /><div className="flex items-center justify-between rounded-xl border border-neon-500/20 bg-neon-500/[0.06] px-4 py-3"><span className="flex items-center gap-2 text-sm text-ink-200"><Scale size={14} /> Risk : Reward</span><span className="mono font-700 text-neon-400">{fmtRR(a.risk_reward)}</span></div></div></GlassCard>}
+            {!entryReady ? <GlassCard className="border border-warn-500/30 bg-warn-500/[0.06] p-6"><div className="flex items-center gap-2 text-warn-400"><Shield size={18} /><h2 className="font-display font-700">Entry status</h2></div><ol className="mt-4 space-y-3 text-sm text-ink-200"><li><strong className="text-white">Direction:</strong> {hasBias ? a.direction.toUpperCase() : 'UNCLEAR'}</li><li><strong className="text-white">Entry:</strong> Not confirmed yet or price levels could not be verified.</li><li><strong className="text-white">Next:</strong> Wait for a pullback, rejection, or fresh structure—then upload a new screenshot.</li></ol></GlassCard> : <GlassCard className="p-6"><div className="flex items-center gap-2"><Target size={17} className="text-neon-400" /><h2 className="font-display font-700 text-white">Trade plan</h2></div><div className="mt-4 space-y-2.5"><LevelRow label="Entry" value={fmtPrice(a.entry, priceDigits)} accent="neutral" /><LevelRow label="Stop loss" value={fmtPrice(a.stop_loss, priceDigits)} accent="bear" /><LevelRow label="Take profit" value={fmtPrice(a.take_profit, priceDigits)} accent="bull" /><div className="flex items-center justify-between rounded-xl border border-neon-500/20 bg-neon-500/[0.06] px-4 py-3"><span className="flex items-center gap-2 text-sm text-ink-200"><Scale size={14} /> Risk : Reward</span><span className="mono font-700 text-neon-400">{fmtRR(a.risk_reward)}</span></div></div></GlassCard>}
 
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-xs leading-relaxed text-ink-400"><Shield size={14} className="mb-2 text-neon-400" />Decision support—not a guarantee. Never risk money you cannot afford to lose.</div>
           </div>
@@ -101,7 +102,7 @@ export function AnalysisPage({ id }: { id: string }) {
           <div className="border-t border-white/[0.06] p-5">
             <div className="grid gap-4 md:grid-cols-3">{a.trend_strength != null && <GlassCard className="p-4"><LinearGauge value={a.trend_strength} label="Trend Strength" mode="high-good" caption="How established the trend is" /></GlassCard>}{a.momentum_score != null && <GlassCard className="p-4"><LinearGauge value={a.momentum_score} label="Momentum" mode="high-good" caption="Current directional force" /></GlassCard>}{a.risk_score != null && <GlassCard className="p-4"><LinearGauge value={a.risk_score} label="Risk" mode="low-good" caption="Lower is safer" /><div className="mt-3"><RiskScoreBar value={a.risk_score} /></div></GlassCard>}</div>
             <div className="mt-5 grid gap-5 lg:grid-cols-2">
-              <GlassCard className="p-5"><h3 className="font-display font-700 text-white">Indicator readings</h3><div className="mt-4 grid gap-3 sm:grid-cols-2">{Object.entries(a.indicators).filter(([name]) => name !== 'Entry Ready').map(([name, value]) => <div key={name} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"><div className="text-xs text-ink-400">{name}</div><div className="mono mt-1 font-600 text-white">{typeof value === 'number' ? value.toFixed(2) : value}</div></div>)}</div></GlassCard>
+              <GlassCard className="p-5"><h3 className="font-display font-700 text-white">Indicator readings</h3><div className="mt-4 grid gap-3 sm:grid-cols-2">{Object.entries(a.indicators).filter(([name]) => !['Entry Ready', 'Price Levels Verified', 'Price Digits'].includes(name)).map(([name, value]) => <div key={name} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"><div className="text-xs text-ink-400">{name}</div><div className="mono mt-1 font-600 text-white">{typeof value === 'number' ? value.toFixed(2) : value}</div></div>)}</div></GlassCard>
               <GlassCard className="p-5"><h3 className="font-display font-700 text-white">Full AI explanation</h3><p className="mt-4 text-sm leading-relaxed text-ink-200">{a.detailed_explanation || a.market_trend}</p></GlassCard>
             </div>
           </div>

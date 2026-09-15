@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { ChartOverlays } from '../lib/supabase';
 
 interface Props {
@@ -25,20 +25,6 @@ export function ChartOverlay({ imageUrl, overlays, entry, stopLoss, takeProfit }
   const [on, setOn] = useState<Record<ToggleKey, boolean>>({
     sr: true, ema: true, liquidity: true, patterns: true, entry: true, stopLoss: true, takeProfit: true,
   });
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const update = () => {
-      if (ref.current) {
-        const r = ref.current.getBoundingClientRect();
-        // force a re-render cycle is unnecessary; we use viewBox so size is responsive
-        void r;
-      }
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
 
   const toggle = (k: ToggleKey) => setOn((s) => ({ ...s, [k]: !s[k] }));
   const W = 1000, H = 600;
@@ -52,6 +38,7 @@ export function ChartOverlay({ imageUrl, overlays, entry, stopLoss, takeProfit }
           <button
             key={t.key}
             onClick={() => toggle(t.key)}
+            aria-pressed={on[t.key]}
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
               on[t.key] ? 'bg-white/[0.06] text-ink-100 ring-1 ring-white/10' : 'text-ink-500 hover:bg-white/[0.03]'
             }`}
@@ -62,8 +49,8 @@ export function ChartOverlay({ imageUrl, overlays, entry, stopLoss, takeProfit }
         ))}
       </div>
 
-      <div ref={ref} className="relative w-full bg-ink-900">
-        <img src={imageUrl} alt="chart" className="block w-full" />
+      <div className="relative w-full bg-ink-900">
+        <img src={imageUrl} alt="Uploaded trading chart with optional annotations" className="block w-full" />
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
           {/* EMA */}
           {on.ema && overlays?.ema50 && (
@@ -104,21 +91,21 @@ export function ChartOverlay({ imageUrl, overlays, entry, stopLoss, takeProfit }
           ))}
 
           {/* Entry zone */}
-          {on.entry && overlays?.entryZone && (
+          {entry != null && on.entry && overlays?.entryZone && (
             <g>
               <rect x={overlays.entryZone.x1 * W} y={overlays.entryZone.y1 * H} width={(overlays.entryZone.x2 - overlays.entryZone.x1) * W} height={(overlays.entryZone.y2 - overlays.entryZone.y1) * H} fill="rgba(16,233,107,0.18)" stroke="#10e96b" strokeWidth={1} strokeDasharray="3 3" rx={4} />
               <text x={(overlays.entryZone.x1 + overlays.entryZone.x2) / 2 * W} y={overlays.entryZone.y1 * H - 6} fill="#10e96b" fontSize={11} textAnchor="middle" className="mono">ENTRY</text>
             </g>
           )}
           {/* Stop loss */}
-          {on.stopLoss && overlays?.stopLoss && (
+          {stopLoss != null && on.stopLoss && overlays?.stopLoss && (
             <g>
               <line x1={overlays.stopLoss.x * W - 44} x2={overlays.stopLoss.x * W + 44} y1={overlays.stopLoss.y * H} y2={overlays.stopLoss.y * H} stroke="#ff4d61" strokeWidth={2.5} />
               <text x={overlays.stopLoss.x * W} y={overlays.stopLoss.y * H + 18} fill="#ff4d61" fontSize={11} textAnchor="middle" className="mono">SL</text>
             </g>
           )}
           {/* Take profit */}
-          {on.takeProfit && overlays?.takeProfit && (
+          {takeProfit != null && on.takeProfit && overlays?.takeProfit && (
             <g>
               <line x1={overlays.takeProfit.x * W - 44} x2={overlays.takeProfit.x * W + 44} y1={overlays.takeProfit.y * H} y2={overlays.takeProfit.y * H} stroke="#10e96b" strokeWidth={2.5} />
               <text x={overlays.takeProfit.x * W} y={overlays.takeProfit.y * H - 8} fill="#10e96b" fontSize={11} textAnchor="middle" className="mono">TP</text>

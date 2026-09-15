@@ -77,9 +77,9 @@ export function HistoryView() {
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
-                    <Stat label="Entry" value={fmtPrice(a.entry)} />
-                    <Stat label="Stop" value={fmtPrice(a.stop_loss)} />
-                    <Stat label="Target" value={fmtPrice(a.take_profit)} />
+                    <Stat label="Entry" value={formatVerifiedLevel(a, a.entry)} />
+                    <Stat label="Stop" value={formatVerifiedLevel(a, a.stop_loss)} />
+                    <Stat label="Target" value={formatVerifiedLevel(a, a.take_profit)} />
                   </div>
                   <button onClick={() => navigate({ name: 'analysis', id: a.id })} className="mt-3 flex items-center gap-1 text-xs text-neon-400 hover:gap-2 transition-all">
                     Open terminal <ArrowRight size={12} />
@@ -92,6 +92,16 @@ export function HistoryView() {
       )}
     </div>
   );
+}
+
+function hasVerifiedTradeLevels(analysis: ChartAnalysis) {
+  return analysis.direction !== 'neutral' && analysis.indicators?.['Entry Ready'] === 1 && analysis.indicators?.['Price Levels Verified'] === 1;
+}
+
+function formatVerifiedLevel(analysis: ChartAnalysis, value: number | null) {
+  if (!hasVerifiedTradeLevels(analysis)) return 'N/A';
+  const digits = Number.isInteger(analysis.indicators?.['Price Digits']) ? analysis.indicators['Price Digits'] : 2;
+  return fmtPrice(value, digits);
 }
 
 function MiniStat({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) {

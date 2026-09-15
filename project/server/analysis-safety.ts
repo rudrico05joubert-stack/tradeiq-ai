@@ -1,6 +1,6 @@
 import type { GeneratedAnalysis } from '../src/lib/engine.js';
 
-export interface SafetyGateContext { symbol: string; timeframe: string; }
+export interface SafetyGateContext { symbol: string; timeframe: string; expectedSymbol?: string | null; }
 
 const IMPULSE_LANGUAGE = /\b(impulsive?|displacement|crash candle|spike|sharp (?:drop|break|move)|large (?:bearish|bullish) candle|oversized candle|break of structure)\b/i;
 const CONFIRMATION_LANGUAGE = /\b(retest|retracement|pullback)\b[\s\S]{0,80}\b(reject(?:ion|ed)?|confirm(?:ation|ed)?|hold|failed)\b/i;
@@ -8,6 +8,43 @@ const LOW_TIMEFRAME = /^(?:M1|M2|M3|M4|M5)$/i;
 const SYNTHETIC_SYMBOL = /\b(?:crash|boom|volatility|step|jump)\b/i;
 const CRASH_SYMBOL = /\bcrash\b/i;
 const BOOM_SYMBOL = /\bboom\b/i;
+
+function canonicalSymbol(value: string) {
+  return value.toUpperCase().replace(/\bINDEX\b/g, '').replace(/[^A-Z0-9]/g, '');
+}
+
+function priceScaleError(analysis: GeneratedAnalysis): string | null {
+  const scale = analysis.price_scale;
+  if (!scale) return 'The uploaded chart price axis could not be read; numeric trade levels are unavailable.';
+  const { low, high, top_y: topY, bottom_y: bottomY, latest, digits } = scale;
+  if (![low, high, topY, bottomY].every(Number.isFinite) ||
+      high <= low || topY < 0 || bottomY > 1 || bottomY - topY < 0.05 ||
+      !Number.isInteger(digits) || digits < 0 || digits > 6 ||
+      (latest != null && (!Number.isFinite(latest) || latest < low || latest > high))) {
+    return 'The chart price axis is inconsistent or unreadable; numeric trade levels are unavailable.';
+  }
+  const levels = [analysis.entry, analysis.stop_loss, analysis.take_profit];
+  if (!levels.every((level) => Number.isFinite(level) && level >= low && level <= high)) {
+    return 'Entry, stop, or target does not match the uploaded chart price scale.';
+  }
+  return null;
+}
+
+function alignedTradeOverlays(analysis: GeneratedAnalysis): GeneratedAnalysis['overlays'] {
+  const scale = analysis.price_scale!;
+  const yFor = (price: number) => scale.top_y + (scale.high - price) / (scale.high - scale.low) * (scale.bottom_y - scale.top_y);
+  const { entryZone, stopLoss, takeProfit } = analysis.overlays;
+  return {
+    ...analysis.overlays,
+    entryZone: entryZone && {
+      ...entryZone,
+      y1: Math.max(scale.top_y, yFor(analysis.entry) - 0.006),
+      y2: Math.min(scale.bottom_y, yFor(analysis.entry) + 0.006),
+    },
+    stopLoss: stopLoss && { ...stopLoss, y: yFor(analysis.stop_loss) },
+    takeProfit: takeProfit && { ...takeProfit, y: yFor(analysis.take_profit) },
+  };
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.round(value)));
@@ -40,14 +77,14 @@ function entryWait(analysis: GeneratedAnalysis, reasons: string[]): GeneratedAna
     direction,
     confidence: analysis.confidence,
     setup_grade: 'C',
-    indicators: { ...analysis.indicators, 'Entry Ready': 0 },
+    indicators: { ...analysis.indicators, 'Entry Ready': 0, 'Price Levels Verified': 0 },
     reasons: [gateReason, ...analysis.reasons].slice(0, 6),
     overlays: { ...analysis.overlays, entryZone: null, stopLoss: null, takeProfit: null },
     detailed_explanation: `${gateReason} Wait for stronger agreement and a confirmed entry structure. ${analysis.detailed_explanation}`,
   };
 }
 
-export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, timeframe }: SafetyGateContext): GeneratedAnalysis {
+export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, timeframe, expectedSymbol }: SafetyGateContext): GeneratedAnalysis {
   const restrictedDirection = CRASH_SYMBOL.test(symbol) ? 'sell' : BOOM_SYMBOL.test(symbol) ? 'buy' : null;
   const oppositeSideBlocked = restrictedDirection !== null && analysis.direction !== restrictedDirection;
   const policyAdjusted: GeneratedAnalysis = oppositeSideBlocked
@@ -58,7 +95,19 @@ export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, tim
         detailed_explanation: `Instrument policy blocked the opposite-side recommendation. ${analysis.detailed_explanation}`,
       }
     : analysis;
-  const calibrated = calibrateConfidence(policyAdjusted);
+  const digits = policyAdjusted.price_scale?.digits;
+  const rounded = digits != null && Number.isInteger(digits) && digits >= 0 && digits <= 6
+    ? { ...policyAdjusted,
+        entry: Number(policyAdjusted.entry.toFixed(digits)),
+        stop_loss: Number(policyAdjusted.stop_loss.toFixed(digits)),
+        take_profit: Number(policyAdjusted.take_profit.toFixed(digits)),
+      }
+    : policyAdjusted;
+  const risk = Math.abs(rounded.entry - rounded.stop_loss);
+  const reward = Math.abs(rounded.take_profit - rounded.entry);
+  const actualRiskReward = Number.isFinite(risk) && Number.isFinite(reward) && risk > 0
+    ? Math.round(reward / risk * 100) / 100 : 0;
+  const calibrated = calibrateConfidence({ ...rounded, risk_reward: actualRiskReward });
   if (calibrated.direction === 'neutral') {
     const bias = inferBias(calibrated);
     const reason = bias === 'neutral'
@@ -75,6 +124,15 @@ export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, tim
   const combinedText = `${calibrated.market_trend} ${calibrated.reasons.join(' ')} ${calibrated.detailed_explanation}`;
 
   if (oppositeSideBlocked) failures.push(`Wait for a confirmed ${restrictedDirection!.toUpperCase()} entry; opposite-side trades are disabled for this instrument.`);
+  if (analysis.detected_symbol === 'UNKNOWN' ||
+      (expectedSymbol && (!analysis.detected_symbol || canonicalSymbol(expectedSymbol) !== canonicalSymbol(analysis.detected_symbol)))) {
+    failures.push('The chart instrument does not match the selected symbol or could not be read.');
+  }
+  const scaleFailure = priceScaleError(calibrated);
+  if (scaleFailure) failures.push(scaleFailure);
+  if (!calibrated.overlays.entryZone || !calibrated.overlays.stopLoss || !calibrated.overlays.takeProfit) {
+    failures.push('The chart does not contain a complete entry, stop, and target overlay.');
+  }
 
   const confidenceFloor = synthetic ? 70 : strictShortHorizon ? 68 : 65;
   if (calibrated.confidence < confidenceFloor) failures.push(`Confidence ${calibrated.confidence}% is below the ${confidenceFloor}% directional threshold.`);
@@ -94,5 +152,8 @@ export function enforceAnalysisSafety(analysis: GeneratedAnalysis, { symbol, tim
 
   return failures.length > 0
     ? entryWait(calibrated, failures)
-    : { ...calibrated, indicators: { ...calibrated.indicators, 'Entry Ready': 1 } };
+    : { ...calibrated, overlays: alignedTradeOverlays(calibrated), indicators: {
+        ...calibrated.indicators, 'Entry Ready': 1, 'Price Levels Verified': 1,
+        'Price Digits': calibrated.price_scale!.digits,
+      } };
 }

@@ -2,6 +2,14 @@ import type { ChartOverlays, Direction, SetupGrade } from './supabase';
 
 export interface GeneratedAnalysis {
   detected_symbol?: string;
+  price_scale?: {
+    low: number;
+    high: number;
+    top_y: number;
+    bottom_y: number;
+    latest: number | null;
+    digits: number;
+  } | null;
   market_trend: string;
   direction: Direction;
   confidence: number; // 0..100
